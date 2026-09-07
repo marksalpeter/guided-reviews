@@ -5,6 +5,21 @@
   --gr-radius: 4px;
   --gr-card-radius: 10px;
   --gr-summary-width: 300px;
+
+  /* positional commit colours: after the fork is blue, before it orange */
+  --gr-after: var(--vscode-textLink-foreground, #4daafc);
+  --gr-before: var(--vscode-charts-orange, #e8973a);
+  --gr-after-selected: var(--gr-after);
+  /* the selection band is dark blue in every theme, so the orange has to be lifted off it */
+  --gr-before-selected: #ffbe6b;
+  /* dimmed by colour rather than opacity: an alpha here composites against whatever it sits on */
+  --gr-faint: #6e6e6e;
+}
+
+body.vscode-light, body.vscode-high-contrast-light {
+  --gr-after: var(--vscode-textLink-foreground, #0a69da);
+  --gr-before: var(--vscode-charts-orange, #b45309);
+  --gr-faint: #9a9a9a;
 }
 
 body {
@@ -78,68 +93,30 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 /* ── branch bar ────────────────────────────────────────────────────────── */
 
-/* two rows, no rule between them: the header band names the branch, the commit bar picks the range */
-.gr-branchbar { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
+/* one row: the fork glyph, the branch compared against, then the two commit chips bracketing the diff */
+.gr-branchbar { display: flex; align-items: center; gap: 3px; min-width: 0; }
 
-.gr-branch-trigger {
+.gr-glyph { flex: 0 0 auto; margin-right: 5px; color: var(--vscode-charts-purple, #8b5cf6); }
+.gr-sep { flex: 0 0 auto; padding: 0 3px; color: var(--vscode-descriptionForeground); }
+
+.gr-dropdown { position: relative; display: flex; min-width: 0; }
+
+.gr-chip {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  max-width: 460px;
-  padding: 2px 6px;
+  max-width: 260px;
+  padding: 3px 8px;
   white-space: nowrap;
   color: var(--vscode-foreground);
   background: transparent;
   border-radius: var(--gr-radius);
 }
 
-.gr-branch-trigger:hover { background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground, transparent)); }
+.gr-chip:hover { background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground, transparent)); }
 
-.gr-branch-glyph { flex: 0 0 auto; color: var(--vscode-charts-purple, #8b5cf6); }
-.gr-branch-lead { flex: 0 0 auto; color: var(--vscode-descriptionForeground); }
-
-.gr-branch-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-family: var(--vscode-editor-font-family);
-  font-weight: 600;
-}
-
-.gr-caret { flex: 0 0 auto; font-size: 0.85em; color: var(--vscode-descriptionForeground); }
-
-/* never overflow: hidden — the commit popups hang out of the pill */
-.gr-commitbar {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  padding: 1px 3px;
-  font-size: 0.92em;
-  white-space: nowrap;
-  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-  border: 1px solid var(--vscode-panel-border);
-  border-radius: 999px;
-}
-
-.gr-commitbar-arrow { flex: 0 0 auto; padding: 0 4px; color: var(--vscode-descriptionForeground); }
-
-.gr-commit-trigger {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  max-width: 260px;
-  padding: 2px 9px;
-  color: var(--vscode-foreground);
-  background: transparent;
-  border-radius: 999px;
-}
-
-.gr-commit-trigger:hover { background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground, transparent)); }
-.gr-commit-owner { flex: 0 0 auto; color: var(--vscode-descriptionForeground); }
-
-.gr-commit-value {
+.gr-chip-value {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -147,8 +124,11 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   font-variant-numeric: tabular-nums;
 }
 
-.gr-dropdown { position: relative; display: flex; min-width: 0; }
+.gr-chip-branch .gr-chip-value { font-weight: 600; }
 
+.gr-caret { flex: 0 0 auto; color: var(--gr-faint); }
+
+/* never overflow: hidden on an ancestor — the popups hang out of the toolbar */
 .gr-popup {
   position: absolute;
   top: calc(100% + 6px);
@@ -156,9 +136,9 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   z-index: 20;
   display: flex;
   flex-direction: column;
-  min-width: 300px;
-  max-width: 460px;
-  max-height: 320px;
+  min-width: 340px;
+  max-width: 520px;
+  max-height: 340px;
   overflow-y: auto;
   padding: 4px;
   font-size: var(--vscode-font-size);
@@ -168,7 +148,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
 }
 
-.gr-commit-row, .gr-branch-row {
+.gr-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -181,29 +161,49 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   border-radius: var(--gr-radius);
 }
 
-.gr-commit-row:hover, .gr-branch-row:hover { background: var(--vscode-list-hoverBackground, var(--vscode-editor-background)); }
+.gr-row:hover { background: var(--vscode-list-hoverBackground, var(--vscode-editor-background)); }
 
-.gr-commit-row.selected, .gr-branch-row.selected {
+.gr-row.selected {
   color: var(--vscode-list-activeSelectionForeground, #ffffff);
   background: var(--vscode-list-activeSelectionBackground, var(--vscode-button-background));
 }
 
-.gr-commit-dot { flex: 0 0 auto; font-size: 0.7em; }
-.gr-commit-ref { flex: 0 0 auto; font-family: var(--vscode-editor-font-family); font-variant-numeric: tabular-nums; }
-.gr-commit-subject { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--vscode-descriptionForeground); }
-.gr-commit-when { flex: 0 0 auto; margin-left: auto; padding-left: 12px; font-size: 0.92em; color: var(--vscode-descriptionForeground); }
+.gr-row.unreachable, .gr-row.unreachable:hover { color: var(--gr-faint); background: transparent; cursor: default; }
 
-.gr-commit-after { color: var(--vscode-textLink-foreground, #4daafc); }
-.gr-commit-before { color: var(--vscode-charts-orange, #b3701c); }
-.gr-commit-none { color: var(--vscode-foreground); }
+.gr-dot { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.gr-row-sha { flex: 0 0 auto; font-family: var(--vscode-editor-font-family); font-variant-numeric: tabular-nums; }
+.gr-row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gr-row-subject { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--vscode-descriptionForeground); }
+.gr-row-when { flex: 0 0 auto; margin-left: auto; padding-left: 12px; font-size: 0.92em; color: var(--vscode-descriptionForeground); }
 
-.gr-commit-row.selected .gr-commit-ref,
-.gr-commit-row.selected .gr-commit-subject,
-.gr-commit-row.selected .gr-commit-when { color: var(--vscode-list-activeSelectionForeground, #ffffff); }
+.gr-tone-after { color: var(--gr-after); }
+.gr-tone-before { color: var(--gr-before); }
+.gr-tone-none { color: var(--vscode-foreground); }
 
-.gr-branch-row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.gr-branch-meta { flex: 0 0 auto; font-size: 0.92em; color: var(--vscode-descriptionForeground); }
-.gr-branch-row.selected .gr-branch-meta { color: var(--vscode-list-activeSelectionForeground, #ffffff); }
+.gr-row.selected.gr-tone-after { color: var(--gr-after-selected); }
+.gr-row.selected.gr-tone-before { color: var(--gr-before-selected); }
+.gr-row.selected.gr-tone-none { color: var(--vscode-list-activeSelectionForeground, #ffffff); }
+
+.gr-row.selected .gr-row-name,
+.gr-row.selected .gr-row-subject,
+.gr-row.selected .gr-row-when { color: var(--vscode-list-activeSelectionForeground, #ffffff); }
+
+.gr-row.unreachable .gr-row-sha,
+.gr-row.unreachable .gr-row-subject,
+.gr-row.unreachable .gr-row-when { color: var(--gr-faint); }
+
+.gr-tag {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  font-size: 0.78em;
+  line-height: 1.6;
+  color: var(--vscode-descriptionForeground);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 999px;
+}
+
+.gr-row.selected .gr-tag { color: var(--vscode-list-activeSelectionForeground, #ffffff); border-color: rgba(255, 255, 255, 0.45); }
+.gr-row.unreachable .gr-tag { color: var(--gr-faint); border-color: var(--gr-faint); }
 
 .gr-fork-marker {
   display: flex;

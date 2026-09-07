@@ -63,13 +63,13 @@ export class ReviewService {
   /** defaultSelection is where the panel opens: the branch's head against the commit it forked from. */
   async defaultSelection(): Promise<Selection> {
     const branch = (await this.git.currentBranch()) || 'HEAD'
-    return this.selectionForBranch(branch)
+    return this.selectionAgainst(branch, await this.git.defaultBranchName())
   }
 
-  /** selectionForBranch pairs a branch's head with the base it should open against. */
-  async selectionForBranch(branch: string): Promise<Selection> {
+  /** selectionAgainst brackets a branch by its merge base with another branch, up to its head. */
+  async selectionAgainst(branch: string, baseBranch: string): Promise<Selection> {
     const headSha = await this.git.revParse(branch)
-    return { branch, baseSha: await this.openingBase(branch, headSha), headSha }
+    return { branch, baseBranch, baseSha: await this.openingBase(branch, baseBranch, headSha), headSha }
   }
 
   /** openSelection creates or advances the review for one selected commit pair. */
@@ -84,8 +84,9 @@ export class ReviewService {
   /** selector builds the toolbar: the branch list, and the one timeline both commit pickers use. */
   async selector(selection: Selection): Promise<SelectorState> {
     return {
-      branches: await this.git.branches(),
-      timeline: await this.git.timeline(selection.branch, commitPickerLimit),
+      branches: await this.git.baseBranches(selection.branch),
+      timeline: await this.git.timeline(selection.branch, selection.baseBranch, commitPickerLimit),
+      baseBranch: selection.baseBranch,
       baseSha: selection.baseSha,
       headSha: selection.headSha,
     }
@@ -208,13 +209,12 @@ export class ReviewService {
     }
   }
 
-  /** openingBase is the fork point a branch grew from, or its previous commit on the default branch. */
-  private async openingBase(branch: string, headSha: string): Promise<string> {
-    const defaultName = await this.git.defaultBranchName()
-    if (branch !== defaultName) {
-      return this.git.mergeBase(await this.git.defaultBranch(), branch)
+  /** openingBase is where the branch meets its base branch, or its previous commit when they are one. */
+  private async openingBase(branch: string, baseBranch: string, headSha: string): Promise<string> {
+    if (branch !== baseBranch) {
+      return this.git.mergeBase(baseBranch, branch)
     }
-    // the default branch forked from nothing, so the newest commit is the reviewable unit
+    // a branch forked from nothing, so the newest commit is the reviewable unit
     return (await this.git.parentOf(headSha)) ?? headSha
   }
 
@@ -225,7 +225,7 @@ export class ReviewService {
     }
     const [head, fork] = await Promise.all([
       this.git.revParse(selection.branch),
-      this.git.mergeBase(await this.git.defaultBranch(), selection.branch),
+      this.git.mergeBase(selection.baseBranch, selection.branch),
     ])
     return selection.headSha === head && selection.baseSha === fork
   }
@@ -297,9 +297,10 @@ export interface LoadedReview {
   files: ChangedFile[]
 }
 
-/** Selection is the branch under review and the two commits picked from its ancestry. */
+/** Selection is the branch under review, the branch it is measured against, and the commits bracketing it. */
 export interface Selection {
   branch: string
+  baseBranch: string
   baseSha: string
   headSha: string
 }

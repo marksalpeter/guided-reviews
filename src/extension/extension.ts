@@ -6,13 +6,13 @@ import { ReviewPanel, viewType } from './reviewPanel.js'
 
 /** activate registers the commands and restores any review tabs from the previous session. */
 export function activate(context: vscode.ExtensionContext): void {
-  const assets = vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview')
+  const root = context.extensionUri
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('guidedReviews.openReview', () => run(assets, openReview)),
-    vscode.commands.registerCommand('guidedReviews.deleteReview', () => run(assets, deleteReview)),
+    vscode.commands.registerCommand('guidedReviews.openReview', () => run(root, openReview)),
+    vscode.commands.registerCommand('guidedReviews.deleteReview', () => run(root, deleteReview)),
     vscode.commands.registerCommand('guidedReviews.installAgentSupport', () =>
-      run(assets, async service => {
+      run(root, async service => {
         await install(context, service)
         void vscode.window.showInformationMessage('Guided Reviews: Claude Code skill and CLI installed.')
       }),
@@ -20,7 +20,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerUriHandler({
       handleUri: uri => {
         if (uri.path === '/review') {
-          void openFromUri(uri, assets)
+          void openFromUri(uri, root)
         }
       },
     }),
@@ -28,29 +28,29 @@ export function activate(context: vscode.ExtensionContext): void {
       async deserializeWebviewPanel(panel) {
         const service = await currentService()
         if (service) {
-          ReviewPanel.adopt(panel, service, await service.defaultSelection(), assets)
+          ReviewPanel.adopt(panel, service, await service.defaultSelection(), root)
         }
       },
     }),
   )
 
-  void run(assets, service => install(context, service), { silent: true })
+  void run(root, service => install(context, service), { silent: true })
 }
 
 /** deactivate is a no-op; every disposable is registered on the context. */
 export function deactivate(): void {}
 
 /** openReview launches straight into the panel; the toolbar, not a quick pick, chooses the commits. */
-async function openReview(service: ReviewService, assets: vscode.Uri): Promise<void> {
-  ReviewPanel.show(service, await service.defaultSelection(), assets)
+async function openReview(service: ReviewService, root: vscode.Uri): Promise<void> {
+  ReviewPanel.show(service, await service.defaultSelection(), root)
 }
 
 /** openFromUri opens the review for the repository a `review` deep link names. */
-async function openFromUri(uri: vscode.Uri, assets: vscode.Uri): Promise<void> {
+async function openFromUri(uri: vscode.Uri, root: vscode.Uri): Promise<void> {
   const repo = new URLSearchParams(uri.query).get('repo') ?? ''
   // the link can land in any window running the extension, so prefer the folder it asked for
   const folder = vscode.workspace.workspaceFolders?.find(candidate => repo.startsWith(candidate.uri.fsPath))
-  await run(assets, openReview, { service: folder ? await serviceFor(folder) : undefined })
+  await run(root, openReview, { service: folder ? await serviceFor(folder) : undefined })
 }
 
 /** deleteReview removes one review's log after confirmation. */
@@ -80,8 +80,8 @@ async function install(context: vscode.ExtensionContext, service: ReviewService)
 
 /** run resolves the workspace repository and hands it to a command, reporting failures once. */
 async function run(
-  assets: vscode.Uri,
-  command: (service: ReviewService, assets: vscode.Uri) => Promise<void>,
+  root: vscode.Uri,
+  command: (service: ReviewService, root: vscode.Uri) => Promise<void>,
   options: { silent?: boolean; service?: ReviewService } = {},
 ): Promise<void> {
   try {
@@ -92,7 +92,7 @@ async function run(
       }
       return
     }
-    await command(service, assets)
+    await command(service, root)
   } catch (error) {
     if (!options.silent) {
       void vscode.window.showErrorMessage(`Guided Reviews: ${messageOf(error)}`)

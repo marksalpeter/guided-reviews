@@ -107,7 +107,7 @@ describe('Git', () => {
   })
 })
 
-describe('Git.branches', () => {
+describe('Git.baseBranches', () => {
   let dir: string
   let git: Git
 
@@ -129,6 +129,16 @@ describe('Git.branches', () => {
       await writeFile(join(dir, `fresh-${i}.txt`), `${i}\n`)
       await commitAt(exec, `fresh ${i}`, when)
     }
+
+    await exec.run('git', ['checkout', '-q', 'main'])
+    await exec.run('git', ['checkout', '-qb', 'feature'])
+    await writeFile(join(dir, 'feature.txt'), 'f\n')
+    await commitAt(exec, 'feature work', '2024-01-01T00:00:00Z')
+
+    await exec.run('git', ['checkout', '--orphan', 'vendor/import'])
+    await exec.run('git', ['rm', '-rfq', '.'])
+    await writeFile(join(dir, 'vendor.txt'), 'v\n')
+    await commitAt(exec, 'vendored import', '2025-01-01T00:00:00Z')
     await exec.run('git', ['checkout', '-q', 'main'])
   })
 
@@ -137,20 +147,36 @@ describe('Git.branches', () => {
   })
 
   it('lists the default branch first, then the rest by most recent commit', async () => {
-    const rows = await git.branches()
+    const rows = await git.baseBranches('feature')
     expect(rows.map(b => b.name)).toEqual(['main', 'fresh', 'stale'])
     expect(rows.map(b => b.isDefault)).toEqual([true, false, false])
   })
 
   it('counts how many commits each branch carries beyond the default branch', async () => {
-    const ahead = Object.fromEntries((await git.branches()).map(b => [b.name, b.ahead]))
+    const ahead = Object.fromEntries((await git.baseBranches('feature')).map(b => [b.name, b.ahead]))
     expect(ahead).toEqual({ main: 0, fresh: 3, stale: 1 })
   })
 
   it('carries each branch head sha and relative commit time', async () => {
-    const fresh = (await git.branches()).find(b => b.name === 'fresh')
+    const fresh = (await git.baseBranches('feature')).find(b => b.name === 'fresh')
     expect(fresh?.headSha).toBe(await git.revParse('fresh'))
     expect(fresh?.when).toBeTruthy()
+  })
+
+  it('omits the branch under review from its own base list', async () => {
+    expect((await git.baseBranches('fresh')).map(b => b.name)).toEqual(['main', 'feature', 'stale'])
+    expect((await git.baseBranches('main')).map(b => b.name)).toEqual(['feature', 'fresh', 'stale'])
+  })
+
+  it('omits a branch that shares no history with the branch under review', async () => {
+    expect(await git.revParse('vendor/import')).toMatch(/^[0-9a-f]{40}$/)
+    expect((await git.baseBranches('feature')).map(b => b.name)).not.toContain('vendor/import')
+    expect((await git.baseBranches('vendor/import')).map(b => b.name)).toEqual([])
+  })
+
+  it('reports a shared base only for related histories', async () => {
+    expect(await git.sharedBase('feature', 'vendor/import')).toBeNull()
+    expect(await git.sharedBase('feature', 'main')).toBe(await git.mergeBase('feature', 'main'))
   })
 })
 
@@ -180,7 +206,7 @@ describe('Git.timeline', () => {
   })
 
   it('flags commits after the fork and leaves shared history unflagged', async () => {
-    const timeline = await git.timeline('feat', 10)
+    const timeline = await git.timeline('feat', 'main', 10)
     expect(timeline.branch).toBe('feat')
     expect(timeline.forkedFrom).toBe('main')
     expect(timeline.commits.map(c => [c.subject, c.afterFork])).toEqual([
@@ -192,13 +218,13 @@ describe('Git.timeline', () => {
   })
 
   it('sets forkSha to the merge base with the default branch', async () => {
-    const timeline = await git.timeline('feat', 10)
+    const timeline = await git.timeline('feat', 'main', 10)
     expect(timeline.forkSha).toBe(await git.mergeBase('main', 'feat'))
     expect(timeline.forkSha).toBe(await git.revParse('main'))
   })
 
   it('reports no fork point for the default branch itself', async () => {
-    const timeline = await git.timeline('main', 10)
+    const timeline = await git.timeline('main', 'main', 10)
     expect(timeline.forkedFrom).toBe('')
     expect(timeline.forkSha).toBe('')
     expect(timeline.commits.map(c => c.subject)).toEqual(['second', 'first'])
@@ -206,7 +232,7 @@ describe('Git.timeline', () => {
   })
 
   it('honours the limit', async () => {
-    const timeline = await git.timeline('feat', 2)
+    const timeline = await git.timeline('feat', 'main', 2)
     expect(timeline.commits.map(c => c.subject)).toEqual(['feat two', 'feat one'])
   })
 })
@@ -240,7 +266,7 @@ describe('Git.timeline across a merge from the default branch', () => {
   })
 
   it('flags branch commits by reachability, not by log order', async () => {
-    const timeline = await git.timeline('feat', 10)
+    const timeline = await git.timeline('feat', 'main', 10)
     // log order sinks 'feat work' below the fork point, so position alone would miscolour it
     expect(timeline.commits.map(c => c.subject)).toEqual([
       'merge main into feat',
@@ -254,7 +280,7 @@ describe('Git.timeline across a merge from the default branch', () => {
   })
 
   it('moves the fork point to the merged default-branch commit', async () => {
-    const timeline = await git.timeline('feat', 10)
+    const timeline = await git.timeline('feat', 'main', 10)
     expect(timeline.forkSha).toBe(await git.revParse('main'))
     const merged = timeline.commits.find(c => c.subject === 'main after fork')
     expect(merged?.sha).toBe(timeline.forkSha)
@@ -297,13 +323,13 @@ describe('Git.defaultBranchName', () => {
   })
 
   it('matches the stripped name against local branches', async () => {
-    const rows = await git.branches()
-    expect(rows.map(b => b.name)).toEqual(['main', 'feat'])
+    const rows = await git.baseBranches('feat')
+    expect(rows.map(b => b.name)).toEqual(['main'])
     expect(rows[0]?.isDefault).toBe(true)
   })
 
   it('labels a branch as forked from the stripped default name', async () => {
-    expect((await git.timeline('feat', 10)).forkedFrom).toBe('main')
+    expect((await git.timeline('feat', 'main', 10)).forkedFrom).toBe('main')
   })
 })
 

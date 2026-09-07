@@ -46,6 +46,7 @@ describe('ReviewService', () => {
 
       expect(selection).toEqual({
         branch: 'feature',
+        baseBranch: 'main',
         baseSha: await service.repo.mergeBase('main', 'feature'),
         headSha: await service.repo.revParse('feature'),
       })
@@ -79,12 +80,12 @@ describe('ReviewService', () => {
       await rm(bare, { recursive: true, force: true })
     })
 
-    it('snaps the base to the fork point when a target branch is chosen', async () => {
+    it('snaps the base to the fork point when a base branch is chosen', async () => {
       await exec.run('git', ['checkout', '-q', 'main'])
       await writeLines(['one', 'two', 'three', 'main moved on'])
       await commit('main advances')
 
-      const selection = await service.selectionForBranch('feature')
+      const selection = await service.selectionAgainst('feature', 'main')
 
       expect(selection.baseSha).toBe(await service.repo.mergeBase('main', 'feature'))
       expect(selection.headSha).toBe(await service.repo.revParse('feature'))
@@ -125,12 +126,12 @@ describe('ReviewService', () => {
       expect(onMain.timeline.forkedFrom).toBe('')
     })
 
-    it('lists the default branch first in the branch picker', async () => {
+    it('lists the default branch first in the branch picker, without the branch under review', async () => {
       const selector = await service.selector(await service.defaultSelection())
 
       expect(selector.branches[0]?.name).toBe('main')
       expect(selector.branches[0]?.isDefault).toBe(true)
-      expect(selector.branches.map(branch => branch.name)).toContain('feature')
+      expect(selector.branches.map(branch => branch.name)).not.toContain('feature')
     })
   })
 

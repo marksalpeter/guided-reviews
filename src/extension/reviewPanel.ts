@@ -13,20 +13,21 @@ export class ReviewPanel {
 
   private panel: vscode.WebviewPanel
   private service: ReviewService
-  private assets: vscode.Uri
+  private root: vscode.Uri
   private selection: Selection
   private key = ''
   private disposables: vscode.Disposable[] = []
   private guideBusy = false
   private guideAttempted = false
 
-  private constructor(panel: vscode.WebviewPanel, service: ReviewService, selection: Selection, assets: vscode.Uri) {
+  private constructor(panel: vscode.WebviewPanel, service: ReviewService, selection: Selection, root: vscode.Uri) {
     this.panel = panel
     this.service = service
     this.selection = selection
-    this.assets = assets
+    this.root = root
 
-    this.panel.webview.options = { enableScripts: true, localResourceRoots: [assets] }
+    this.panel.iconPath = tabIcon(root)
+    this.panel.webview.options = { enableScripts: true, localResourceRoots: [assetsIn(root)] }
     this.panel.webview.html = this.html()
     this.disposables.push(this.panel.webview.onDidReceiveMessage((m: ViewMessage) => void this.onMessage(m)))
     this.disposables.push(this.watchStore())
@@ -34,7 +35,7 @@ export class ReviewPanel {
   }
 
   /** show opens or focuses this repository's panel on a selection. */
-  static show(service: ReviewService, selection: Selection, assets: vscode.Uri): ReviewPanel {
+  static show(service: ReviewService, selection: Selection, root: vscode.Uri): ReviewPanel {
     const existing = ReviewPanel.open.get(service.repo.repoRoot)
     if (existing) {
       existing.panel.reveal()
@@ -45,12 +46,12 @@ export class ReviewPanel {
       enableScripts: true,
       retainContextWhenHidden: true,
     })
-    return ReviewPanel.adopt(panel, service, selection, assets)
+    return ReviewPanel.adopt(panel, service, selection, root)
   }
 
   /** adopt attaches a panel VS Code restored on startup to a live selection. */
-  static adopt(panel: vscode.WebviewPanel, service: ReviewService, selection: Selection, assets: vscode.Uri): ReviewPanel {
-    const created = new ReviewPanel(panel, service, selection, assets)
+  static adopt(panel: vscode.WebviewPanel, service: ReviewService, selection: Selection, root: vscode.Uri): ReviewPanel {
+    const created = new ReviewPanel(panel, service, selection, root)
     ReviewPanel.open.set(service.repo.repoRoot, created)
     void created.retarget(selection)
     return created
@@ -87,8 +88,8 @@ export class ReviewPanel {
         case 'ready':
           await this.push()
           return await this.autoGenerateGuide()
-        case 'selectBranch':
-          return await this.retarget(await this.service.selectionForBranch(message.branch))
+        case 'selectBaseBranch':
+          return await this.retarget(await this.service.selectionAgainst(this.selection.branch, message.branch))
         case 'selectBase':
           return await this.retarget({ ...this.selection, baseSha: message.sha })
         case 'selectTarget':
@@ -201,8 +202,9 @@ export class ReviewPanel {
   private html(): string {
     const nonce = randomBytes(16).toString('hex')
     const webview = this.panel.webview
-    const script = webview.asWebviewUri(vscode.Uri.joinPath(this.assets, 'main.js'))
-    const style = webview.asWebviewUri(vscode.Uri.joinPath(this.assets, 'main.css'))
+    const assets = assetsIn(this.root)
+    const script = webview.asWebviewUri(vscode.Uri.joinPath(assets, 'main.js'))
+    const style = webview.asWebviewUri(vscode.Uri.joinPath(assets, 'main.css'))
     const csp = [
       `default-src 'none'`,
       `img-src ${webview.cspSource} data:`,
@@ -234,6 +236,19 @@ export class ReviewPanel {
       disposable.dispose()
     }
     this.disposables = []
+  }
+}
+
+/** assetsIn locates the built webview bundle inside the extension. */
+function assetsIn(root: vscode.Uri): vscode.Uri {
+  return vscode.Uri.joinPath(root, 'dist', 'webview')
+}
+
+/** tabIcon is the fork glyph the editor tab carries, in a weight for each theme. */
+function tabIcon(root: vscode.Uri): { light: vscode.Uri; dark: vscode.Uri } {
+  return {
+    light: vscode.Uri.joinPath(root, 'media', 'tab-icon-light.svg'),
+    dark: vscode.Uri.joinPath(root, 'media', 'tab-icon-dark.svg'),
   }
 }
 

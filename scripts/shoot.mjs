@@ -22,6 +22,9 @@ const themes = {
     'editorGroupHeader-tabsBackground': '#181818', 'editor-lineHighlightBackground': '#2a2a2a',
     'errorForeground': '#f85149', 'editorWarning-foreground': '#cca700',
     'gitDecoration-addedResourceForeground': '#4ec983', 'gitDecoration-deletedResourceForeground': '#f14c4c',
+    'charts-orange': '#d18616', 'charts-purple': '#b180d7',
+    'list-hoverBackground': '#2a2d2e', 'list-activeSelectionBackground': '#04395e',
+    'list-activeSelectionForeground': '#ffffff', 'toolbar-hoverBackground': '#5a5d5e50',
   },
   light: {
     'editor-background': '#ffffff', 'editor-foreground': '#3b3b3b', 'foreground': '#3b3b3b',
@@ -38,6 +41,9 @@ const themes = {
     'editorGroupHeader-tabsBackground': '#f8f8f8', 'editor-lineHighlightBackground': '#f0f0f0',
     'errorForeground': '#f85149', 'editorWarning-foreground': '#bf8803',
     'gitDecoration-addedResourceForeground': '#1a7f37', 'gitDecoration-deletedResourceForeground': '#cf222e',
+    'charts-orange': '#d18616', 'charts-purple': '#652d90',
+    'list-hoverBackground': '#e8e8e8', 'list-activeSelectionBackground': '#0060c0',
+    'list-activeSelectionForeground': '#ffffff', 'toolbar-hoverBackground': '#b8b8b850',
   },
 }
 

@@ -7,10 +7,11 @@ export interface LoadedDiff {
   diff: string
 }
 
-/** SelectorState drives the toolbar: one branch choice, and the two commits picked from its ancestry. */
+/** SelectorState drives the toolbar: the branch compared against, and the two commits bracketing the diff. */
 export interface SelectorState {
   branches: BranchSummary[]
   timeline: Timeline
+  baseBranch: string
   baseSha: string
   headSha: string
 }
@@ -30,7 +31,7 @@ export type HostMessage =
 /** ViewMessage is sent from the webview to the extension host. */
 export type ViewMessage =
   | { type: 'ready' }
-  | { type: 'selectBranch'; branch: string }
+  | { type: 'selectBaseBranch'; branch: string }
   | { type: 'selectBase'; sha: string }
   | { type: 'selectTarget'; sha: string }
   | { type: 'startThread'; path: string; side: 'old' | 'new'; line: number; endLine?: number; body: string }

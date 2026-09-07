@@ -50,6 +50,12 @@ export class Git {
     return out.trim()
   }
 
+  /** sharedBase is the common ancestor, or null when the two histories are unrelated. */
+  async sharedBase(a: string, b: string): Promise<string | null> {
+    const out = await this.tryGit(['merge-base', a, b])
+    return out ? out.trim() : null
+  }
+
   /** parentOf is a commit's first parent, or null at the root of history. */
   async parentOf(rev: string): Promise<string | null> {
     const out = await this.tryGit(['rev-parse', '--verify', '--quiet', `${rev}^1^{commit}`])
@@ -128,8 +134,8 @@ export class Git {
     return full.replace(/^[^/]+\//, '')
   }
 
-  /** branches lists local branches for the picker: the default branch first, then by newest commit. */
-  async branches(): Promise<BranchSummary[]> {
+  /** baseBranches lists the branches a branch can be compared against, newest first after the default. */
+  async baseBranches(branch: string): Promise<BranchSummary[]> {
     const defaultName = await this.defaultBranchName()
     const out = await this.git([
       'for-each-ref',
@@ -144,16 +150,23 @@ export class Git {
         const [name = '', headSha = '', when = ''] = line.split('\0')
         return { name, headSha, when, isDefault: name === defaultName }
       })
-    const withCounts = await Promise.all(
-      rows.map(async row => ({ ...row, ahead: row.isDefault ? 0 : await this.aheadCount(defaultName, row.name) })),
+      // a branch cannot be its own base, and an unrelated history has nothing to compare against
+      .filter(row => row.name !== branch)
+
+    const candidates = await Promise.all(
+      rows.map(async row => ({
+        ...row,
+        ahead: await this.aheadCount(defaultName, row.name),
+        shares: (await this.sharedBase(row.name, branch)) !== null,
+      })),
     )
-    // for-each-ref already sorted by recency; only the default branch jumps the queue
-    return [...withCounts.filter(row => row.isDefault), ...withCounts.filter(row => !row.isDefault)]
+    const offered = candidates.filter(row => row.shares).map(({ shares: _shares, ...row }) => row)
+    return [...offered.filter(row => row.isDefault), ...offered.filter(row => !row.isDefault)]
   }
 
   /** timeline is one branch's selectable history, flagging which commits postdate the fork. */
-  async timeline(branch: string, limit: number): Promise<Timeline> {
-    const forkedFrom = await this.defaultBranchName()
+  async timeline(branch: string, against: string, limit: number): Promise<Timeline> {
+    const forkedFrom = against
     const isDefault = branch === forkedFrom
     const forkSha = isDefault ? '' : await this.mergeBase(forkedFrom, branch)
     // a set membership test, rather than log order, so a merged-in base commit cannot be miscoloured

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { baseTriggerLabel, commitRef, commitTone, forkMarkerIndex, shortSha } from './BranchBar.js'
+import { chipLabel, commitPill, commitTone, forkMarkerIndex, isReachable, shortSha } from './BranchBar.js'
 import type { Timeline, TimelineCommit } from '../core/types.js'
 
 const commit = (sha: string, subject: string, afterFork: boolean): TimelineCommit => ({
@@ -29,41 +29,46 @@ const unforked: Timeline = {
   commits: [commit('f00ba12aaaa', 'add the picker', false), commit('9dd4e5cffff', 'wire the protocol', false)],
 }
 
-describe('commitRef', () => {
+describe('chipLabel', () => {
   it('reads as head at the tip of the branch', () => {
-    expect(commitRef('f00ba12aaaa', forked)).toBe('head')
+    expect(chipLabel('f00ba12aaaa', forked)).toBe('head')
   })
 
-  it('reads as the parent branch at the fork point', () => {
-    expect(commitRef('c31de0bbbbb', forked)).toBe('main')
+  it('reads as merge-base at the fork point', () => {
+    expect(chipLabel('c31de0bbbbb', forked)).toBe('merge-base')
   })
 
   it('reads as a short sha anywhere else', () => {
-    expect(commitRef('9dd4e5cffff', forked)).toBe('9dd4e5c')
-    expect(commitRef('7a1b2c3dddd', forked)).toBe('7a1b2c3')
+    expect(chipLabel('9dd4e5cffff', forked)).toBe('9dd4e5c')
+    expect(chipLabel('7a1b2c3dddd', forked)).toBe('7a1b2c3')
   })
 
-  it('reads as a short sha at the fork sha of an unforked branch', () => {
-    expect(commitRef('9dd4e5cffff', unforked)).toBe('9dd4e5c')
+  it('reads as a short sha below the tip of an unforked branch', () => {
+    expect(chipLabel('9dd4e5cffff', unforked)).toBe('9dd4e5c')
   })
 })
 
-describe('baseTriggerLabel', () => {
-  it('owns a commit below the fork to the parent branch', () => {
-    expect(baseTriggerLabel('7a1b2c3dddd', forked)).toEqual({ owner: 'main', ref: '7a1b2c3' })
+describe('commitPill', () => {
+  it('pills the tip commit as head', () => {
+    expect(commitPill('f00ba12aaaa', forked)).toBe('head')
   })
 
-  it('drops the owner at the fork point itself', () => {
-    expect(baseTriggerLabel('c31de0bbbbb', forked)).toEqual({ owner: '', ref: 'main' })
+  it('pills the merge base', () => {
+    expect(commitPill('c31de0bbbbb', forked)).toBe('merge-base')
   })
 
-  it('drops the owner above the fork', () => {
-    expect(baseTriggerLabel('9dd4e5cffff', forked)).toEqual({ owner: '', ref: '9dd4e5c' })
-    expect(baseTriggerLabel('f00ba12aaaa', forked)).toEqual({ owner: '', ref: 'head' })
+  it('leaves an ordinary commit unpilled', () => {
+    expect(commitPill('9dd4e5cffff', forked)).toBe('')
+    expect(commitPill('7a1b2c3dddd', forked)).toBe('')
   })
 
-  it('drops the owner on an unforked branch', () => {
-    expect(baseTriggerLabel('9dd4e5cffff', unforked)).toEqual({ owner: '', ref: '9dd4e5c' })
+  it('pills nothing but the tip without a fork sha', () => {
+    expect(commitPill('f00ba12aaaa', unforked)).toBe('head')
+    expect(commitPill('9dd4e5cffff', unforked)).toBe('')
+  })
+
+  it('prefers head where the tip is itself the merge base', () => {
+    expect(commitPill('f00ba12aaaa', { ...forked, forkSha: 'f00ba12aaaa' })).toBe('head')
   })
 })
 
@@ -98,6 +103,33 @@ describe('forkMarkerIndex', () => {
 
   it('has no marker in an empty timeline', () => {
     expect(forkMarkerIndex({ ...forked, commits: [] })).toBe(-1)
+  })
+})
+
+describe('isReachable', () => {
+  it('reaches only rows older than the target when picking the base', () => {
+    expect(isReachable(2, 'base', 1)).toBe(true)
+    expect(isReachable(3, 'base', 1)).toBe(true)
+    expect(isReachable(0, 'base', 1)).toBe(false)
+  })
+
+  it('leaves the target row itself out of reach of the base', () => {
+    expect(isReachable(1, 'base', 1)).toBe(false)
+  })
+
+  it('reaches only rows newer than the base when picking the target', () => {
+    expect(isReachable(1, 'target', 2)).toBe(true)
+    expect(isReachable(0, 'target', 2)).toBe(true)
+    expect(isReachable(3, 'target', 2)).toBe(false)
+  })
+
+  it('leaves the base row itself out of reach of the target', () => {
+    expect(isReachable(2, 'target', 2)).toBe(false)
+  })
+
+  it('reaches every row when the other end is off the timeline', () => {
+    expect(isReachable(0, 'base', -1)).toBe(true)
+    expect(isReachable(0, 'target', -1)).toBe(true)
   })
 })
 

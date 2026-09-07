@@ -74,25 +74,27 @@ revisions first.
   history: base is the previous commit, target is the head. The newest commit, in other
   words.
 
-The panel is scoped to one branch, named in its own line above the diff:
+The panel is scoped to one branch, and the toolbar reads as a single sentence:
 
 ```
-⑂ Review feat/x ▾
-[ main ▾  →  head ▾ ]
+⑂ main ▾  /  merge-base ▾  →  head ▾
 ```
 
-That line is the branch dropdown — it picks the branch under review and with it the whole
-timeline. Both commit dropdowns select out of that one ancestry, so a pair spanning two
-unrelated branches cannot be expressed. Choosing a branch snaps the base back to the
-commit it forked from.
+The first dropdown is the branch you are comparing against — the default branch first,
+then the rest by most recent commit. A branch that shares no history with the one you are
+on is not offered at all. Picking one snaps the base back to the commit the two branches
+last had in common.
 
-The commits name themselves by what they are rather than by sha wherever they can. The
-tip reads `head`, the fork point reads `main` — so the resting state is `main → head`,
-with no shas at all. A sha appears once you move off those: go back past the fork and the
-base reads `main / c0e64a2`; move it up onto the branch's own commits and it is a bare
-sha, since the line above already names the branch. The full sha is on hover throughout.
+The other two pick the commits bracketing the diff, both out of the current branch's
+ancestry, so a pair spanning two unrelated branches cannot be expressed. They offer the
+same list; a commit that would put the base at or after the target is dimmed rather than
+hidden, so you can still see where you are in the history.
 
-Inside a dropdown, commits at or after the fork point are blue and the ones before it —
+Commits name themselves by what they are rather than by sha where they can. The tip reads
+`head` and the fork point reads `merge-base`, so the resting state carries no shas at
+all; move off either and it becomes a short sha, with the full one on hover.
+
+Inside a commit dropdown, commits after the fork point are blue and the ones before it —
 shared with the branch you forked from — are orange, with a marker ruling off where the
 branch diverged. On the default branch there is no fork, so there is no marker and no
 colour split; the rows are plain.
