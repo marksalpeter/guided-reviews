@@ -57,6 +57,25 @@ describe('foldReview', () => {
     expect(state.threads).toHaveLength(0)
   })
 
+  it('deletes one comment and drops the thread when its last comment goes', () => {
+    const opened: ReviewEvent[] = [
+      created,
+      { t: 'thread.opened', id: 't1', anchor: anchor(10), at: 'a' },
+      { t: 'comment.added', id: 'c1', threadId: 't1', author: 'human', body: 'first', at: 'b' },
+      { t: 'comment.added', id: 'c2', threadId: 't1', author: 'agent', body: 'second', at: 'c' },
+    ]
+
+    const trimmed = foldReview([...opened, { t: 'comment.deleted', threadId: 't1', commentId: 'c1', at: 'd' }])
+    expect(trimmed.threads[0]?.comments.map(c => c.body)).toEqual(['second'])
+
+    const emptied = foldReview([
+      ...opened,
+      { t: 'comment.deleted', threadId: 't1', commentId: 'c1', at: 'd' },
+      { t: 'comment.deleted', threadId: 't1', commentId: 'c2', at: 'e' },
+    ])
+    expect(emptied.threads).toHaveLength(0)
+  })
+
   it('resolves and reopens a thread', () => {
     const base: ReviewEvent[] = [created, { t: 'thread.opened', id: 't1', anchor: anchor(10), at: 'a' }]
     const resolved = foldReview([...base, { t: 'thread.resolved', threadId: 't1', at: 'b' }])

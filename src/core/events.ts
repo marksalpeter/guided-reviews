@@ -9,6 +9,7 @@ export type ReviewEvent =
   | HeadMoved
   | ThreadOpened
   | CommentAdded
+  | CommentDeleted
   | ThreadResolved
   | ThreadReopened
   | GuideGenerated
@@ -50,6 +51,7 @@ const knownTypes = new Set([
   'review.head_moved',
   'thread.opened',
   'comment.added',
+  'comment.deleted',
   'thread.resolved',
   'thread.reopened',
   'guide.generated',
@@ -95,6 +97,14 @@ export interface CommentAdded {
   threadId: string
   author: 'human' | 'agent'
   body: string
+  at: string
+}
+
+/** CommentDeleted removes one message; a thread loses its last message and disappears with it. */
+export interface CommentDeleted {
+  t: 'comment.deleted'
+  threadId: string
+  commentId: string
   at: string
 }
 

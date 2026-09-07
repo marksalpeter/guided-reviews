@@ -25,7 +25,11 @@ export const CommentThread = ({ thread }: { thread: Thread }) => {
         <>
           {thread.status === 'outdated' && <OutdatedNotice thread={thread} />}
           {thread.comments.map(comment => (
-            <CommentBody key={comment.id} comment={comment} />
+            <CommentBody
+              key={comment.id}
+              comment={comment}
+              onDelete={() => post({ type: 'deleteComment', threadId: thread.id, commentId: comment.id })}
+            />
           ))}
           <Composer
             placeholder={resolved ? 'Reply to reopen…' : 'Reply…'}
@@ -37,7 +41,7 @@ export const CommentThread = ({ thread }: { thread: Thread }) => {
   )
 }
 
-/** ResolveTick is the checkmark in the thread's top corner. */
+/** ResolveTick is the bare checkmark in the thread's top corner. */
 const ResolveTick = ({ resolved, onToggle }: { resolved: boolean; onToggle: () => void }) => (
   <button
     className={`gr-tick${resolved ? ' checked' : ''}`}
@@ -47,16 +51,36 @@ const ResolveTick = ({ resolved, onToggle }: { resolved: boolean; onToggle: () =
     title={resolved ? 'Reopen' : 'Resolve'}
     onClick={onToggle}
   >
-    ✓
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+      <path fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" d="M3 8.6 6.2 12 13 4.6" />
+    </svg>
   </button>
 )
 
-/** CommentBody renders one message, labelling only the agent. */
-const CommentBody = ({ comment }: { comment: Comment }) => (
+/** CommentBody renders one message, labelling only the agent, with a delete affordance on hover. */
+const CommentBody = ({ comment, onDelete }: { comment: Comment; onDelete: () => void }) => (
   <div className="gr-comment">
-    {comment.author === 'agent' && <span className="gr-author">agent</span>}
-    {comment.body}
+    <div className="gr-comment-body">
+      {comment.author === 'agent' && <span className="gr-author">agent</span>}
+      {comment.body}
+    </div>
+    <button className="gr-comment-delete" aria-label="Delete comment" title="Delete comment" onClick={onDelete}>
+      <TrashIcon />
+    </button>
   </div>
+)
+
+/** TrashIcon is the delete glyph shown when a comment is hovered. */
+const TrashIcon = () => (
+  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+    <path
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 8.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8l.7-8.2M6.6 7v4M9.4 7v4"
+    />
+  </svg>
 )
 
 /** OutdatedNotice shows the code a thread was written against once that code has moved on. */

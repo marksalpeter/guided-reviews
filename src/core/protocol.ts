@@ -37,6 +37,7 @@ export type ViewMessage =
   | { type: 'startThread'; path: string; side: 'old' | 'new'; line: number; endLine?: number; body: string }
   | { type: 'startGroupThread'; groupId: string; body: string }
   | { type: 'reply'; threadId: string; body: string }
+  | { type: 'deleteComment'; threadId: string; commentId: string }
   | { type: 'resolve'; threadId: string }
   | { type: 'reopen'; threadId: string }
   | { type: 'markReviewed'; path: string; blob: string }

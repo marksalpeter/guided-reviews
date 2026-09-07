@@ -103,6 +103,9 @@ export class ReviewPanel {
         case 'reply':
           await this.service.reply(this.key, message.threadId, message.body, 'human')
           break
+        case 'deleteComment':
+          await this.service.deleteComment(this.key, message.threadId, message.commentId)
+          break
         case 'resolve':
           await this.service.resolveThread(this.key, message.threadId)
           break

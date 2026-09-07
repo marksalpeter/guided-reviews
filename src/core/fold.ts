@@ -70,6 +70,17 @@ function applyEvent(state: ReviewState, threads: Map<string, Thread>, event: Rev
       thread?.comments.push(toComment(event))
       return
     }
+    case 'comment.deleted': {
+      const thread = threads.get(event.threadId)
+      if (!thread) {
+        return
+      }
+      thread.comments = thread.comments.filter(comment => comment.id !== event.commentId)
+      if (thread.comments.length === 0) {
+        threads.delete(event.threadId)
+      }
+      return
+    }
     case 'thread.resolved':
       setThreadState(threads, event.threadId, 'resolved')
       return

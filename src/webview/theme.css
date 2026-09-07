@@ -420,23 +420,28 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 .gr-tick {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 20px;
   height: 20px;
   padding: 0;
-  line-height: 18px;
-  text-align: center;
-  border-radius: 5px;
   background: transparent;
-  border: 1px solid var(--vscode-panel-border);
+  border: none;
+  border-radius: var(--gr-radius);
   cursor: pointer;
+  opacity: 0.5;
+  color: var(--vscode-descriptionForeground);
 }
 
-.gr-tick { color: var(--vscode-panel-border); }
-.gr-tick:hover { color: var(--vscode-descriptionForeground); border-color: var(--vscode-descriptionForeground); }
-.gr-tick.checked { background: var(--vscode-button-background); border-color: var(--vscode-button-background); color: var(--vscode-button-foreground); }
-.gr-tick.checked:hover { color: var(--vscode-button-foreground); }
+.gr-tick:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground, transparent));
+}
+
+.gr-tick.checked { opacity: 1; color: var(--vscode-charts-green, var(--vscode-textLink-foreground)); }
 
 .gr-thread-collapsed {
   display: block;
@@ -452,7 +457,32 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   white-space: nowrap;
 }
 
-.gr-comment { margin-bottom: 8px; line-height: 1.5; white-space: pre-wrap; }
+.gr-comment { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px; line-height: 1.5; }
+.gr-comment-body { flex: 1; min-width: 0; white-space: pre-wrap; }
+
+.gr-comment-delete {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--gr-radius);
+  cursor: pointer;
+  visibility: hidden;
+  opacity: 0.6;
+  color: var(--vscode-descriptionForeground);
+}
+
+.gr-comment:hover .gr-comment-delete { visibility: visible; }
+
+.gr-comment-delete:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground, transparent));
+}
 .gr-author { font-weight: 600; margin-right: 6px; color: var(--vscode-textLink-foreground); }
 
 .gr-composer { display: flex; gap: 8px; align-items: flex-end; margin-top: 8px; }

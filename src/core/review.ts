@@ -180,6 +180,11 @@ export class ReviewService {
     return this.store.append(key, { t: 'file.unreviewed', path, at: now() })
   }
 
+  /** deleteComment drops one message from a thread, taking the thread with it when nothing is left. */
+  deleteComment(key: string, threadId: string, commentId: string): Promise<void> {
+    return this.store.append(key, { t: 'comment.deleted', threadId, commentId, at: now() })
+  }
+
   /** resolveThread closes a thread, which hides it from the agent. */
   resolveThread(key: string, threadId: string): Promise<void> {
     return this.store.append(key, { t: 'thread.resolved', threadId, at: now() })

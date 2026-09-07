@@ -208,6 +208,28 @@ describe('ReviewService', () => {
     expect(unresolvedThreads((await service.load(key)).state)).toHaveLength(1)
   })
 
+  it('deletes a reply without touching the rest of the thread', async () => {
+    const key = await service.openBranchReview()
+    const id = await service.startThread(key, 'a.ts', 'new', 4, 'fix this')
+    await service.reply(key, id, 'a second thought', 'human')
+    const [, reply] = (await service.load(key)).state.threads[0]?.comments ?? []
+
+    await service.deleteComment(key, id, reply?.id ?? '')
+
+    const thread = (await service.load(key)).state.threads[0]
+    expect(thread?.comments.map(c => c.body)).toEqual(['fix this'])
+  })
+
+  it('deletes the whole thread when its only comment goes', async () => {
+    const key = await service.openBranchReview()
+    const id = await service.startThread(key, 'a.ts', 'new', 4, 'fix this')
+    const [only] = (await service.load(key)).state.threads[0]?.comments ?? []
+
+    await service.deleteComment(key, id, only?.id ?? '')
+
+    expect((await service.load(key)).state.threads).toHaveLength(0)
+  })
+
   it('drops a thread out of the unanswered list once the agent replies', async () => {
     const key = await service.openBranchReview()
     const id = await service.startThread(key, 'a.ts', 'new', 4, 'fix this')
