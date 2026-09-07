@@ -2,14 +2,20 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { parseDiff, type FileData } from 'react-diff-view'
 import { orderPaths } from '../core/ordering.js'
 import type { HostMessage, LoadedDiff, ReviewPayload } from '../core/protocol.js'
-import type { GuideGroup, Thread } from '../core/types.js'
+import type { Guide, GuideGroup, Thread } from '../core/types.js'
 import { BranchBar } from './BranchBar.js'
-import { CommentThread } from './CommentThread.js'
+import { CommentThread, threadElementId } from './CommentThread.js'
 import { FileDiff, fileAnchorId, pathOf } from './FileDiff.js'
 import { FileList, isReviewed, reviewedCount } from './FileList.js'
 import { GuideStatus } from './GuideStatus.js'
 import { activeTheme, loadRefractor, type RefractorLike } from './highlight.js'
 import { loadViewState, post, saveViewState } from './vscodeApi.js'
+
+/** focusRevealFrames is how many frames a deep-linked thread is given to render before giving up. */
+const focusRevealFrames = 60
+
+/** focusHighlightMs is how long a revealed thread stays marked. */
+const focusHighlightMs = 2500
 
 /** App is the review shell: a toolbar, then chapters of summary-beside-diff. */
 export const App = () => {
@@ -17,15 +23,19 @@ export const App = () => {
   const [fatal, setFatal] = useState('')
   const [mode, setMode] = useState<Mode>(loadViewState().mode ?? 'guided')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(loadViewState().collapsed ?? []))
+  // a deep-linked comment must be on screen even in a file the reader has collapsed or ticked off
+  const [forced, setForced] = useState<Set<string>>(new Set())
 
   useHostMessages(setPayload, setFatal)
   useEffect(() => saveViewState({ mode, collapsed: [...collapsed] }), [mode, collapsed])
 
-  const files = useMemo(() => (payload ? parseDiff(payload.review.diff) : []), [payload])
+  // the host sends a fresh payload object on every action, so both memos key on the text they parse
+  const files = useMemo(() => (payload ? parseDiff(payload.review.diff) : []), [payload?.review.diff])
   const refractor = useRefractor(files)
-  const chapters = useChapters(files, payload, mode)
+  const chapters = useChapters(files, payload?.review.state.guide, mode)
   const scroller = useRef<HTMLDivElement>(null)
   useScrollAnchor(scroller, chapters)
+  useFocusedThread(payload, setCollapsed, setForced)
 
   const jumpToFile = useCallback((path: string) => {
     document.getElementById(fileAnchorId(path))?.scrollIntoView({ block: 'start' })
@@ -80,6 +90,7 @@ export const App = () => {
                     refractor={refractor}
                     reviewed={isReviewed(reviewedBlobs[path], meta?.newBlob)}
                     collapsed={collapsed.has(path)}
+                    forced={forced.has(path)}
                     onToggleCollapsed={() => toggleCollapsed(path)}
                     onToggleReviewed={() =>
                       isReviewed(reviewedBlobs[path], meta?.newBlob)
@@ -182,6 +193,65 @@ const OutdatedThreads = ({ threads }: { threads: Thread[] }) => (
   </div>
 )
 
+/** useFocusedThread reveals the comment a deep link named, opening the file that holds it. */
+function useFocusedThread(
+  payload: ReviewPayload | null,
+  setCollapsed: (update: (previous: Set<string>) => Set<string>) => void,
+  setForced: (update: (previous: Set<string>) => Set<string>) => void,
+): void {
+  const focus = payload?.focusThread
+  const threads = payload?.review.state.threads
+
+  useEffect(() => {
+    if (!focus) {
+      return
+    }
+    const anchor = threads?.find(thread => thread.id === focus)?.anchor
+    if (anchor?.kind === 'line') {
+      setCollapsed(previous => {
+        const next = new Set(previous)
+        next.delete(anchor.path)
+        return next
+      })
+      setForced(previous => new Set(previous).add(anchor.path))
+    }
+    return revealThread(focus)
+    // the reveal is a one-shot, so it follows the named thread and nothing else
+  }, [focus])
+}
+
+/** revealThread scrolls a thread into view once it has rendered, and marks it for the reader's eye. */
+function revealThread(threadId: string): () => void {
+  let frames = focusRevealFrames
+  let frame = 0
+  let clear = 0
+
+  const look = () => {
+    const element = document.getElementById(threadElementId(threadId))
+    if (!element) {
+      frame = frames-- > 0 ? requestAnimationFrame(look) : 0
+      return
+    }
+    // the file it sits in may have just expanded, so let that layout settle before gliding to it
+    frame = requestAnimationFrame(() => {
+      element.scrollIntoView({ block: 'center', behavior: motionPreference() })
+      element.classList.add('focused')
+      clear = window.setTimeout(() => element.classList.remove('focused'), focusHighlightMs)
+    })
+  }
+  frame = requestAnimationFrame(look)
+
+  return () => {
+    cancelAnimationFrame(frame)
+    window.clearTimeout(clear)
+  }
+}
+
+/** motionPreference glides to a comment unless the reader has asked the system for less motion. */
+function motionPreference(): ScrollBehavior {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+}
+
 /** useRefractor loads only the grammars this review's files need, rendering plain until ready. */
 function useRefractor(files: FileData[]): RefractorLike | null {
   const [refractor, setRefractor] = useState<RefractorLike | null>(null)
@@ -219,11 +289,12 @@ function useHostMessages(onReview: (payload: ReviewPayload) => void, onError: (m
 }
 
 /** useChapters groups the diff under its guide chapters, or into one bare chapter without a guide. */
-function useChapters(files: FileData[], payload: ReviewPayload | null, mode: Mode): Chapter[] {
+function useChapters(files: FileData[], guide: Guide | undefined, mode: Mode): Chapter[] {
+  const signature = guide ? `${guide.headSha}:${guide.groups.map(group => group.id).join('|')}` : ''
+
   return useMemo(() => {
-    const guide = mode === 'guided' ? payload?.review.state.guide : undefined
     const byPath = new Map(files.map(file => [pathOf(file), file]))
-    if (!guide) {
+    if (!guide || mode !== 'guided') {
       return files.length === 0 ? [] : [{ id: 'all', files }]
     }
 
@@ -246,7 +317,8 @@ function useChapters(files: FileData[], payload: ReviewPayload | null, mode: Mod
       chapters.push({ id: 'ungrouped', files: rest })
     }
     return chapters
-  }, [files, payload, mode])
+    // the guide arrives as a fresh object each push; its head and chapter ids are what change
+  }, [files, signature, mode])
 }
 
 /** useScrollAnchor keeps the file under the reader pinned when the guide reorders the pane. */

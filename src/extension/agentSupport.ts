@@ -2,6 +2,7 @@ import { chmod, lstat, mkdir, readFile, readlink, rm, symlink, writeFile } from 
 import { dirname, join, relative } from 'node:path'
 import { storeDir } from '../core/git.js'
 import { ReviewStore } from '../core/store.js'
+import { commentsDir, stubExtension, threadLinkPath } from '../core/threadLinks.js'
 
 /** shimRelativePath is where the agent-facing CLI launcher is written, inside the ignored store. */
 export const shimRelativePath = `${storeDir}/bin/review`
@@ -16,7 +17,7 @@ export const skillRelativePath = `${skillDirRelativePath}/SKILL.md`
 export const claudeSkillRelativePath = '.claude/skills/guided-reviews'
 
 /** skillVersion is bumped whenever the skill's contract changes, forcing a rewrite. */
-export const skillVersion = 3
+export const skillVersion = 4
 
 /** installAgentSupport writes the shim and skill, and hides the skill from git for this clone only. */
 export async function installAgentSupport(options: InstallOptions): Promise<void> {
@@ -140,6 +141,21 @@ ${shimRelativePath} reply <thread-id> -m "handled the null case in abc123"
 
 Reply after you have made the change, and say what you changed. The human sees
 your reply appear live in the review panel.
+
+## Linking the human to a comment
+
+Every thread the \`comments\` command prints has a stub file at
+\`${commentsDir}/<thread-id>${stubExtension}\`, written for you by that command. Hand it to
+the human as a **markdown link** with that repo-relative path:
+
+\`\`\`md
+[the null check comment](${threadLinkPath('t_abc')})
+\`\`\`
+
+Clicking it opens the review panel and scrolls to that comment. Use it whenever
+you name a thread in your answer. The \`vscode://\` deep link the \`comments\`
+command also prints is for pasting into a terminal or Quick Open — most chat
+windows will not follow it, so prefer the file link.
 
 ## What you must not do
 

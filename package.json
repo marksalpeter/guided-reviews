@@ -42,6 +42,12 @@
         "command": "guidedReviews.deleteReview",
         "title": "Delete Review",
         "category": "Guided Reviews"
+      },
+      {
+        "command": "guidedReviews.focusComment",
+        "title": "Open Comment",
+        "category": "Guided Reviews",
+        "enablement": "false"
       }
     ],
     "keybindings": [
@@ -76,7 +82,19 @@
           "description": "Generate the guided review automatically when a review is opened."
         }
       }
-    }
+    },
+    "customEditors": [
+      {
+        "viewType": "guidedReviews.comment",
+        "displayName": "Guided Reviews Comment",
+        "selector": [
+          {
+            "filenamePattern": "**/.guided-review/comments/*.comment"
+          }
+        ],
+        "priority": "default"
+      }
+    ]
   },
   "scripts": {
     "build": "npm run build:webview && npm run build:node",

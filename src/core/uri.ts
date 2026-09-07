@@ -1,9 +1,10 @@
 /** extensionId addresses this extension inside an editor deep link. */
 export const extensionId = 'marksalpeter.guided-reviews'
 
-/** reviewUri is the deep link that opens the branch review for one repository. */
-export function reviewUri(scheme: string, repoRoot: string): string {
-  return `${scheme}://${extensionId}/review?repo=${encodeURIComponent(repoRoot)}`
+/** reviewUri is the deep link that opens the branch review for one repository, on one comment when named. */
+export function reviewUri(scheme: string, repoRoot: string, threadId?: string): string {
+  const target = threadId ? `&thread=${encodeURIComponent(threadId)}` : ''
+  return `${scheme}://${extensionId}/review?repo=${encodeURIComponent(repoRoot)}${target}`
 }
 
 /** openCommand is the platform command that hands a uri to the editor registered for its scheme. */

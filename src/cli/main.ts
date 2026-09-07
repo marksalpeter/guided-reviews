@@ -3,6 +3,7 @@ import { unansweredThreads, unresolvedThreads } from '../core/fold.js'
 import { Git } from '../core/git.js'
 import { ReviewService } from '../core/review.js'
 import { ReviewStore } from '../core/store.js'
+import { writeThreadLinks } from '../core/threadLinks.js'
 import { openCommand, reviewUri } from '../core/uri.js'
 import { noThreadsMessage, renderThreads } from './render.js'
 
@@ -55,14 +56,20 @@ async function runReview(out: Writer): Promise<number> {
 /** runComments prints the unresolved threads for the review covering the current HEAD. */
 async function runComments(args: readonly string[], out: Writer): Promise<number> {
   const { service, key } = await resolveReview()
+  const root = service.repo.repoRoot
+  const scheme = process.env.REVIEW_URI_SCHEME ?? 'vscode'
   const review = await service.load(key)
   const threads = args.includes('--unanswered') ? unansweredThreads(review.state) : unresolvedThreads(review.state)
 
+  // the stubs must exist before the links are printed, or a click resolves to nothing
+  await writeThreadLinks(root, threads)
+
   if (args.includes('--json')) {
-    out.write(`${JSON.stringify({ key, refs: review.state.refs, threads }, null, 2)}\n`)
+    const linked = threads.map(thread => ({ ...thread, link: reviewUri(scheme, root, thread.id) }))
+    out.write(`${JSON.stringify({ key, refs: review.state.refs, threads: linked }, null, 2)}\n`)
     return 0
   }
-  out.write(`${renderThreads(review, threads)}\n`)
+  out.write(`${renderThreads(review, threads, id => reviewUri(scheme, root, id))}\n`)
   return 0
 }
 

@@ -21,6 +21,8 @@ export interface ReviewPayload {
   review: LoadedDiff
   selector: SelectorState
   guideBusy: boolean
+  /** focusThread is the comment a deep link asked the panel to reveal, if any. */
+  focusThread?: string
 }
 
 /** HostMessage is sent from the extension host to the webview. */

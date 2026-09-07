@@ -27,6 +27,7 @@ export const FileDiff = ({
   refractor,
   reviewed,
   collapsed,
+  forced,
   onToggleCollapsed,
   onToggleReviewed,
 }: {
@@ -36,13 +37,14 @@ export const FileDiff = ({
   refractor: RefractorLike | null
   reviewed: boolean
   collapsed: boolean
+  forced: boolean
   onToggleCollapsed: () => void
   onToggleReviewed: () => void
 }) => {
   const [pending, setPending] = useState<PendingComment | null>(null)
   const tokens = useTokens(file, refractor)
   const widgets = useWidgets(file, threads, pending, setPending)
-  const hidden = reviewed || collapsed
+  const hidden = (reviewed || collapsed) && !forced
 
   return (
     <section className={`gr-file${reviewed ? ' reviewed' : ''}`} id={fileAnchorId(pathOf(file))}>

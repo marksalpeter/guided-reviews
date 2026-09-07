@@ -46,6 +46,11 @@ describe('renderThreads', () => {
     expect(out).toContain('human: needs a null check')
   })
 
+  it('links each thread to its comment in the panel when given a link builder', () => {
+    const out = renderThreads(review, [lineThread()], id => `vscode://ext/review?thread=${id}`)
+    expect(out).toContain('src/a.ts:4  [t_abc]  vscode://ext/review?thread=t_abc')
+  })
+
   it('uses the relocated line rather than the original', () => {
     expect(renderThreads(review, [lineThread({ status: 'relocated', resolvedLine: 9 })])).toContain('src/a.ts:9')
   })

@@ -2,6 +2,9 @@ import { useState } from 'react'
 import type { Comment, Thread } from '../core/types.js'
 import { post } from './vscodeApi.js'
 
+/** threadElementId is how a deep link finds one thread's card in the document. */
+export const threadElementId = (threadId: string): string => `gr-thread-${threadId}`
+
 /** collapsedPreviewLength is how much of the first comment a resolved thread shows. */
 const collapsedPreviewLength = 90
 
@@ -11,7 +14,7 @@ export const CommentThread = ({ thread }: { thread: Thread }) => {
   const resolved = thread.state === 'resolved'
 
   return (
-    <div className={`gr-thread${resolved ? ' resolved' : ''}`}>
+    <div className={`gr-thread${resolved ? ' resolved' : ''}`} id={threadElementId(thread.id)}>
       <ResolveTick
         resolved={resolved}
         onToggle={() => post({ type: resolved ? 'reopen' : 'resolve', threadId: thread.id })}

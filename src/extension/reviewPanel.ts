@@ -1,7 +1,8 @@
 import * as vscode from 'vscode'
 import { randomBytes } from 'node:crypto'
 import { ClaudeCli } from '../core/guide.js'
-import type { HostMessage, ReviewPayload, ViewMessage } from '../core/protocol.js'
+import { stat } from 'node:fs/promises'
+import type { HostMessage, ReviewPayload, SelectorState, ViewMessage } from '../core/protocol.js'
 import { ReviewService, type Selection } from '../core/review.js'
 
 /** viewType identifies the panel for VS Code's tab restore. */
@@ -19,6 +20,9 @@ export class ReviewPanel {
   private disposables: vscode.Disposable[] = []
   private guideBusy = false
   private guideAttempted = false
+  private selectorCache: { for: string; state: SelectorState } | undefined
+  private lastLogSize = -1
+  private focusThread: string | undefined
 
   private constructor(panel: vscode.WebviewPanel, service: ReviewService, selection: Selection, root: vscode.Uri) {
     this.panel = panel
@@ -32,6 +36,16 @@ export class ReviewPanel {
     this.disposables.push(this.panel.webview.onDidReceiveMessage((m: ViewMessage) => void this.onMessage(m)))
     this.disposables.push(this.watchStore())
     this.panel.onDidDispose(() => this.dispose())
+  }
+
+  /** find returns the panel already open for a repository, so a link can raise it before any git work. */
+  static find(repoRoot: string): ReviewPanel | undefined {
+    return ReviewPanel.open.get(repoRoot)
+  }
+
+  /** reveal brings the panel to the foreground. */
+  reveal(): void {
+    this.panel.reveal()
   }
 
   /** show opens or focuses this repository's panel on a selection. */
@@ -60,13 +74,61 @@ export class ReviewPanel {
   /** push sends the current selection and, once one exists, the review it resolves to. */
   async push(): Promise<void> {
     try {
-      const selector = await this.service.selector(this.selection)
+      // read the size first, so an append that lands mid-push still looks new to the watcher
+      const size = await this.logSize()
+      const selector = await this.selector()
       const { state, files } = await this.service.load(this.key)
       const diff = await this.service.repo.unifiedDiff(state.refs.baseSha, state.refs.headSha)
-      const payload: ReviewPayload = { review: { state, files, diff }, selector, guideBusy: this.guideBusy }
+      const payload: ReviewPayload = {
+        review: { state, files, diff },
+        selector,
+        guideBusy: this.guideBusy,
+        ...(this.focusThread ? { focusThread: this.focusThread } : {}),
+      }
+      // the reveal is a one-shot: a later push must not yank the reader back to that comment
+      this.focusThread = undefined
       this.send({ type: 'review', payload })
+      this.lastLogSize = size
     } catch (error) {
       this.send({ type: 'error', message: messageOf(error) })
+    }
+  }
+
+  /** focus reveals one comment, bringing the panel forward so a deep link lands on the thread. */
+  async focus(threadId: string): Promise<void> {
+    this.focusThread = threadId
+    this.panel.reveal()
+    await this.push()
+  }
+
+  /** selector reuses the branch list and timeline, rebuilding them only when the selection or the branch moves. */
+  private async selector(): Promise<SelectorState> {
+    const tip = await this.tipOf(this.selection.branch)
+    const { branch, baseBranch, baseSha, headSha } = this.selection
+    const key = [branch, baseBranch, baseSha, headSha, tip].join('\u0000')
+    if (this.selectorCache?.for === key) {
+      return this.selectorCache.state
+    }
+    const state = await this.service.selector(this.selection)
+    this.selectorCache = { for: key, state }
+    return state
+  }
+
+  /** tipOf is the branch's current commit, the one thing outside the panel that dates the timeline. */
+  private async tipOf(branch: string): Promise<string> {
+    try {
+      return await this.service.repo.revParse(branch)
+    } catch {
+      return ''
+    }
+  }
+
+  /** logSize is the length of the review's log, which only ever grows as events are appended. */
+  private async logSize(): Promise<number> {
+    try {
+      return (await stat(this.service.reviews.pathFor(this.key))).size
+    } catch {
+      return -1
     }
   }
 
@@ -190,10 +252,19 @@ export class ReviewPanel {
     // the whole store, not one file: the panel re-points between logs as the reader changes commits
     const pattern = new vscode.RelativePattern(this.service.repo.repoRoot, '.guided-review/*.jsonl')
     const watcher = vscode.workspace.createFileSystemWatcher(pattern)
-    const reload = debounce(() => void this.push(), 120)
+    // our own appends were already pushed, so only a write we have not folded yet is worth the work
+    const reload = debounce(() => void this.pushIfLogGrew(), 120)
     watcher.onDidChange(reload)
     watcher.onDidCreate(reload)
     return watcher
+  }
+
+  /** pushIfLogGrew re-reads the review only when someone else appended to its log. */
+  private async pushIfLogGrew(): Promise<void> {
+    if ((await this.logSize()) === this.lastLogSize) {
+      return
+    }
+    await this.push()
   }
 
   /** send posts one message to the webview. */

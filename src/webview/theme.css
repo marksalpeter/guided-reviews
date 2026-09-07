@@ -415,6 +415,8 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   max-width: 760px;
 }
 
+.gr-thread.focused { border-color: var(--vscode-focusBorder); box-shadow: 0 0 0 1px var(--vscode-focusBorder); }
+
 .gr-thread.resolved { opacity: 0.6; }
 .gr-thread.resolved:hover { opacity: 1; }
 

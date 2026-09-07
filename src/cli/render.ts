@@ -4,8 +4,11 @@ import type { Thread } from '../core/types.js'
 /** noThreadsMessage is printed when the agent has nothing to act on. */
 export const noThreadsMessage = 'No unresolved review comments.'
 
+/** LinkFor builds the deep link that opens one thread in the panel. */
+export type LinkFor = (threadId: string) => string
+
 /** renderThreads formats threads as the markdown the agent reads. */
-export function renderThreads(review: LoadedReview, threads: readonly Thread[]): string {
+export function renderThreads(review: LoadedReview, threads: readonly Thread[], linkFor?: LinkFor): string {
   if (threads.length === 0) {
     return noThreadsMessage
   }
@@ -16,23 +19,24 @@ export function renderThreads(review: LoadedReview, threads: readonly Thread[]):
     `${threads.length} unresolved ${threads.length === 1 ? 'thread' : 'threads'}`,
   ].join('\n')
 
-  return [header, ...threads.map(renderThread), replyInstructions].join('\n\n')
+  return [header, ...threads.map(thread => renderThread(thread, linkFor)), replyInstructions].join('\n\n')
 }
 
 /** renderThread formats one thread with its location, quoted code and conversation. */
-function renderThread(thread: Thread): string {
-  return [renderHeading(thread), renderQuote(thread), renderConversation(thread)].filter(Boolean).join('\n')
+function renderThread(thread: Thread, linkFor?: LinkFor): string {
+  return [renderHeading(thread, linkFor), renderQuote(thread), renderConversation(thread)].filter(Boolean).join('\n')
 }
 
 /** renderHeading identifies where the thread is anchored and whether it still points at live code. */
-function renderHeading(thread: Thread): string {
+function renderHeading(thread: Thread, linkFor?: LinkFor): string {
+  const link = linkFor ? `  ${linkFor(thread.id)}` : ''
   if (thread.anchor.kind === 'group') {
-    return `## group: ${thread.anchor.groupId}  [${thread.id}]\nfiles: ${thread.anchor.files.join(', ') || 'none'}`
+    return `## group: ${thread.anchor.groupId}  [${thread.id}]${link}\nfiles: ${thread.anchor.files.join(', ') || 'none'}`
   }
   const line = thread.resolvedLine ?? thread.anchor.line
   const range = thread.anchor.endLine ? `${line}-${thread.anchor.endLine}` : `${line}`
   const status = thread.status === 'outdated' ? '  (outdated — the line below has since changed)' : ''
-  return `## ${thread.anchor.path}:${range}  [${thread.id}]${status}\nblob ${short(thread.anchor.blob)}`
+  return `## ${thread.anchor.path}:${range}  [${thread.id}]${link}${status}\nblob ${short(thread.anchor.blob)}`
 }
 
 /** renderQuote shows the code the reviewer was looking at. */

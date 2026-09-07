@@ -3,6 +3,7 @@ import { mkdtemp, rm, readFile, lstat, stat, symlink, writeFile, mkdir, readlink
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { SystemExec } from '../core/exec.js'
+import { threadLinkPath } from '../core/threadLinks.js'
 import {
   claudeSkillRelativePath,
   excludeFromGit,
@@ -97,6 +98,20 @@ describe('agent support', () => {
     expect(skill).toContain('You cannot resolve threads')
     expect(skill).toContain(`${shimRelativePath} comments`)
     expect(skill).toContain(`${shimRelativePath} reply`)
+  })
+
+  it('writes a skill that tells the agent how to hand the human a link to a comment', async () => {
+    await installAgentSupport({
+      repoRoot: dir,
+      gitCommonDir: join(dir, '.git'),
+      nodePath: '/usr/bin/code',
+      cliPath: '/ext/dist/cli.js',
+      uriScheme: 'vscode',
+    })
+
+    const skill = await readFile(join(dir, skillRelativePath), 'utf8')
+    expect(skill).toContain(threadLinkPath('t_abc'))
+    expect(skill).toContain('markdown link')
   })
 
   it('really keeps the skill out of git status', async () => {

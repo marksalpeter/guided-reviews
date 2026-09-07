@@ -6,6 +6,10 @@ describe('review uri', () => {
     expect(reviewUri('cursor', '/repo')).toBe(`cursor://${extensionId}/review?repo=%2Frepo`)
   })
 
+  it('targets one thread when the link is for a comment', () => {
+    expect(reviewUri('vscode', '/repo', 't_abc')).toBe(`vscode://${extensionId}/review?repo=%2Frepo&thread=t_abc`)
+  })
+
   it('encodes a repository path containing spaces', () => {
     expect(reviewUri('vscode', '/a b/repo')).toContain('repo=%2Fa%20b%2Frepo')
   })
