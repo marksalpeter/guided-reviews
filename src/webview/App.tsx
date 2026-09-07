@@ -3,7 +3,7 @@ import { parseDiff, type FileData } from 'react-diff-view'
 import { orderPaths } from '../core/ordering.js'
 import type { HostMessage, LoadedDiff, ReviewPayload } from '../core/protocol.js'
 import type { GuideGroup, Thread } from '../core/types.js'
-import { BranchBar, BranchPicker } from './BranchBar.js'
+import { BranchBar } from './BranchBar.js'
 import { CommentThread } from './CommentThread.js'
 import { FileDiff, fileAnchorId, pathOf } from './FileDiff.js'
 import { FileList, isReviewed, reviewedCount } from './FileList.js'
@@ -21,7 +21,7 @@ export const App = () => {
   useHostMessages(setPayload, setFatal)
   useEffect(() => saveViewState({ mode, collapsed: [...collapsed] }), [mode, collapsed])
 
-  const files = useMemo(() => (payload?.review ? parseDiff(payload.review.diff) : []), [payload])
+  const files = useMemo(() => (payload ? parseDiff(payload.review.diff) : []), [payload])
   const refractor = useRefractor(files)
   const chapters = useChapters(files, payload, mode)
   const scroller = useRef<HTMLDivElement>(null)
@@ -47,17 +47,6 @@ export const App = () => {
   }
 
   const { review } = payload
-  if (!review) {
-    return (
-      <div className="gr-shell">
-        <Toolbar selector={payload.selector} hasReview={false} mode={mode} onMode={setMode} />
-        <div className="gr-main">
-          <BranchPicker branches={payload.selector.branches} />
-        </div>
-      </div>
-    )
-  }
-
   const { state } = review
   // the payload crosses a process boundary, so never assume the map arrived
   const reviewedBlobs = state.reviewedBlobs ?? {}
@@ -65,7 +54,7 @@ export const App = () => {
 
   return (
     <div className="gr-shell">
-      <Toolbar selector={payload.selector} hasReview mode={mode} onMode={setMode} />
+      <Toolbar selector={payload.selector} mode={mode} onMode={setMode} />
 
       <div className="gr-main" ref={scroller}>
         {chapters.length === 0 && <div className="gr-empty">No changes between these commits.</div>}
@@ -113,17 +102,15 @@ export const App = () => {
 /** Toolbar is the sticky header: the ref selectors on the left, the view toggle on the right. */
 const Toolbar = ({
   selector,
-  hasReview,
   mode,
   onMode,
 }: {
   selector: ReviewPayload['selector']
-  hasReview: boolean
   mode: Mode
   onMode: (mode: Mode) => void
 }) => (
   <div className="gr-toolbar">
-    <BranchBar selector={selector} hasReview={hasReview} />
+    <BranchBar selector={selector} />
     <span className="gr-spacer" />
     <div className="gr-modes">
       <button aria-pressed={mode === 'guided'} onClick={() => onMode('guided')}>
@@ -234,7 +221,7 @@ function useHostMessages(onReview: (payload: ReviewPayload) => void, onError: (m
 /** useChapters groups the diff under its guide chapters, or into one bare chapter without a guide. */
 function useChapters(files: FileData[], payload: ReviewPayload | null, mode: Mode): Chapter[] {
   return useMemo(() => {
-    const guide = mode === 'guided' ? payload?.review?.state.guide : undefined
+    const guide = mode === 'guided' ? payload?.review.state.guide : undefined
     const byPath = new Map(files.map(file => [pathOf(file), file]))
     if (!guide) {
       return files.length === 0 ? [] : [{ id: 'all', files }]

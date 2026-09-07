@@ -1,134 +1,99 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import type { BranchSummary, TimelineCommit } from '../core/types.js'
+
 import type { SelectorState } from '../core/protocol.js'
+import type { BranchSummary, Timeline, TimelineCommit } from '../core/types.js'
 import { post } from './vscodeApi.js'
 
-/** BranchBar is the toolbar's ref selector: a derived base chip, an arrow, then the target branch and its commit. */
-export const BranchBar = ({ selector, hasReview }: { selector: SelectorState; hasReview: boolean }) => {
-  const commits = selector.timeline?.commits ?? []
-  const headSha = timelineHeadSha(selector)
-  const forkedFrom = selector.timeline?.forkedFrom ?? ''
+/** BranchBar is the toolbar's two rows: the branch under review, then the commit range inside it. */
+export const BranchBar = ({ selector }: { selector: SelectorState }) => (
+  <div className="gr-branchbar">
+    <BranchDropdown branches={selector.branches} branch={selector.timeline.branch} />
 
-  return (
-    <div className="gr-branchbar">
-      <span className={`gr-chip${hasReview ? '' : ' gr-chip-inert'}`}>
-        <span className="gr-chip-branch" title={selector.baseBranch}>
-          {selector.baseBranch}
-        </span>
-        <span className="gr-chip-sep" aria-hidden="true">
-          ▸
-        </span>
-        {hasReview ? (
-          <CommitDropdown
-            commits={commits}
-            selectedSha={selector.baseSha}
-            headSha={headSha}
-            forkedFrom={forkedFrom}
-            onSelect={sha => post({ type: 'selectBase', sha })}
-          />
-        ) : (
-          <span className="gr-chip-value">head</span>
-        )}
+    <div className="gr-commitbar">
+      <CommitDropdown
+        timeline={selector.timeline}
+        selectedSha={selector.baseSha}
+        label={baseTriggerLabel(selector.baseSha, selector.timeline)}
+        onSelect={sha => post({ type: 'selectBase', sha })}
+      />
+      <span className="gr-commitbar-arrow" aria-hidden="true">
+        →
       </span>
-
-      <span className="gr-branchbar-arrow" aria-hidden="true">
-        ──→
-      </span>
-
-      <span className="gr-chip">
-        <BranchDropdown branches={selector.branches} selected={selector.timeline?.branch} />
-        {hasReview && (
-          <>
-            <span className="gr-chip-sep" aria-hidden="true">
-              ▸
-            </span>
-            <CommitDropdown
-              commits={commits}
-              selectedSha={selector.headSha}
-              headSha={headSha}
-              forkedFrom={forkedFrom}
-              onSelect={sha => post({ type: 'selectTarget', sha })}
-            />
-          </>
-        )}
-      </span>
+      <CommitDropdown
+        timeline={selector.timeline}
+        selectedSha={selector.headSha}
+        label={{ owner: '', ref: commitRef(selector.headSha, selector.timeline) }}
+        onSelect={sha => post({ type: 'selectTarget', sha })}
+      />
     </div>
-  )
-}
-
-/** BranchPicker fills the main pane while no target branch is chosen. */
-export const BranchPicker = ({ branches }: { branches: readonly BranchSummary[] }) => (
-  <div className="gr-branchpicker">
-    <h2 className="gr-branchpicker-title">Select a target branch</h2>
-    {branches
-      .filter(branch => !branch.isDefault)
-      .map(branch => (
-        <button
-          key={branch.name}
-          className="gr-branchpicker-row"
-          onClick={() => post({ type: 'selectBranch', branch: branch.name })}
-        >
-          <span className="gr-branchpicker-name">{branch.name}</span>
-          <span className="gr-spacer" />
-          <span className="gr-branchpicker-meta">{branch.ahead} commits</span>
-          <span className="gr-branchpicker-meta">{branch.when}</span>
-        </button>
-      ))}
   </div>
 )
 
-/** BranchDropdown picks the branch under review, and with it the whole timeline. */
-const BranchDropdown = ({ branches, selected }: { branches: readonly BranchSummary[]; selected?: string }) => (
-  <Dropdown label={selected ?? 'Select a target branch'} title={selected}>
+/** BranchDropdown is the header band: the fork glyph, the branch under review, and the branch list it opens. */
+const BranchDropdown = ({ branches, branch }: { branches: readonly BranchSummary[]; branch: string }) => (
+  <Dropdown
+    className="gr-branch-trigger"
+    title={branch}
+    trigger={
+      <>
+        <ForkGlyph />
+        <span className="gr-branch-lead">Review</span>
+        <span className="gr-branch-name">{branch}</span>
+      </>
+    }
+  >
     {close =>
-      branches.map(branch => (
+      branches.map(summary => (
         <button
-          key={branch.name}
+          key={summary.name}
           role="option"
-          aria-selected={branch.name === selected}
-          className={`gr-branch-row${branch.name === selected ? ' selected' : ''}`}
+          aria-selected={summary.name === branch}
+          className={`gr-branch-row${summary.name === branch ? ' selected' : ''}`}
           onClick={() => {
-            post({ type: 'selectBranch', branch: branch.name })
+            post({ type: 'selectBranch', branch: summary.name })
             close()
           }}
         >
-          <span className="gr-branch-name">{branch.name}</span>
+          <span className="gr-branch-row-name">{summary.name}</span>
           <span className="gr-spacer" />
-          <span className="gr-branch-meta">{branch.when}</span>
+          <span className="gr-branch-meta">{summary.when}</span>
         </button>
       ))
     }
   </Dropdown>
 )
 
-/** CommitDropdown picks one commit out of the timeline both chips share. */
+/** CommitDropdown picks one end of the range out of the timeline both ends share. */
 const CommitDropdown = ({
-  commits,
+  timeline,
   selectedSha,
-  headSha,
-  forkedFrom,
+  label,
   onSelect,
 }: {
-  commits: readonly TimelineCommit[]
+  timeline: Timeline
   selectedSha: string
-  headSha: string
-  forkedFrom: string
+  label: CommitLabel
   onSelect: (sha: string) => void
 }) => {
-  const selected = commits.find(commit => commit.sha === selectedSha)
-  const marker = forkMarkerIndex(commits)
+  const marker = forkMarkerIndex(timeline)
   return (
     <Dropdown
-      label={selected ? commitRowLabel(selected, headSha).ref : shortSha(selectedSha)}
-      title={selected?.subject}
+      className="gr-commit-trigger"
+      title={selectedSha}
+      trigger={
+        <>
+          {label.owner && <span className="gr-commit-owner">{label.owner} /</span>}
+          <span className="gr-commit-value">{label.ref}</span>
+        </>
+      }
     >
       {close =>
-        commits.map((commit, index) => (
+        timeline.commits.map((commit, index) => (
           <Fragment key={commit.sha}>
-            {index === marker && <ForkMarker forkedFrom={forkedFrom} />}
+            {index === marker && <ForkMarker forkedFrom={timeline.forkedFrom} />}
             <CommitRow
               commit={commit}
-              headSha={headSha}
+              timeline={timeline}
               selected={commit.sha === selectedSha}
               onSelect={() => {
                 onSelect(commit.sha)
@@ -145,32 +110,30 @@ const CommitDropdown = ({
 /** CommitRow is one commit in a dropdown, coloured by which side of the fork it sits on. */
 const CommitRow = ({
   commit,
-  headSha,
+  timeline,
   selected,
   onSelect,
 }: {
   commit: TimelineCommit
-  headSha: string
+  timeline: Timeline
   selected: boolean
   onSelect: () => void
-}) => {
-  const { ref, subject } = commitRowLabel(commit, headSha)
-  return (
-    <button
-      role="option"
-      aria-selected={selected}
-      className={`gr-commit-row ${commit.afterFork ? 'gr-commit-after' : 'gr-commit-before'}${selected ? ' selected' : ''}`}
-      title={commit.subject}
-      onClick={onSelect}
-    >
-      <span className="gr-commit-dot" aria-hidden="true">
-        ●
-      </span>
-      <span className="gr-commit-ref">{ref}</span>
-      <span className="gr-commit-subject">{subject}</span>
-    </button>
-  )
-}
+}) => (
+  <button
+    role="option"
+    aria-selected={selected}
+    className={`gr-commit-row gr-commit-${commitTone(commit, timeline)}${selected ? ' selected' : ''}`}
+    title={commit.sha}
+    onClick={onSelect}
+  >
+    <span className="gr-commit-dot" aria-hidden="true">
+      ●
+    </span>
+    <span className="gr-commit-ref">{commitRef(commit.sha, timeline)}</span>
+    <span className="gr-commit-subject">{commit.subject}</span>
+    <span className="gr-commit-when">{commit.when}</span>
+  </button>
+)
 
 /** ForkMarker rules off the commits shared with the branch this one grew out of. */
 const ForkMarker = ({ forkedFrom }: { forkedFrom: string }) => (
@@ -180,14 +143,31 @@ const ForkMarker = ({ forkedFrom }: { forkedFrom: string }) => (
   </div>
 )
 
-/** Dropdown is the button-and-popup listbox both chips use, since a native select cannot colour its rows. */
+/** ForkGlyph is the extension's own trunk-and-limb mark, drawn in the current text colour. */
+const ForkGlyph = () => (
+  <svg className="gr-branch-glyph" viewBox="0 0 128 128" width="13" height="13" aria-hidden="true">
+    <g stroke="currentColor" fill="none" strokeLinecap="round" strokeWidth="12">
+      <path d="M 42 32 L 42 96" />
+      <path d="M 42 88 C 42 60 82 68 82 42" />
+    </g>
+    <g fill="currentColor">
+      <circle cx="42" cy="32" r="13" />
+      <circle cx="42" cy="96" r="13" />
+      <circle cx="82" cy="42" r="13" />
+    </g>
+  </svg>
+)
+
+/** Dropdown is the button-and-popup listbox every trigger uses, since a native select cannot colour its rows. */
 const Dropdown = ({
-  label,
+  className,
   title,
+  trigger,
   children,
 }: {
-  label: string
+  className: string
   title?: string
+  trigger: ReactNode
   children: (close: () => void) => ReactNode
 }) => {
   const [open, setOpen] = useState(false)
@@ -197,15 +177,15 @@ const Dropdown = ({
   return (
     <span className="gr-dropdown" ref={root}>
       <button
-        className="gr-chip-button"
+        className={className}
         aria-haspopup="listbox"
         aria-expanded={open}
         title={title}
         onClick={() => setOpen(previous => !previous)}
       >
-        <span className="gr-chip-value">{label}</span>
-        <span className="gr-chip-caret" aria-hidden="true">
-          ˅
+        {trigger}
+        <span className="gr-caret" aria-hidden="true">
+          ▾
         </span>
       </button>
       {open && (
@@ -242,21 +222,39 @@ function useDismiss(root: RefObject<HTMLElement | null>, open: boolean, onDismis
   }, [root, open, onDismiss])
 }
 
-/** commitRowLabel names a commit in a dropdown: `head` at the branch tip, otherwise short sha plus subject. */
-export function commitRowLabel(commit: TimelineCommit, headSha: string): CommitLabel {
-  return commit.sha === headSha ? { ref: 'head', subject: '' } : { ref: shortSha(commit.sha), subject: commit.subject }
+/** commitRef names a commit: `head` at the tip, the branch it forked from at the fork point, else a short sha. */
+export function commitRef(sha: string, timeline: Timeline): string {
+  if (sha === timeline.commits[0]?.sha) {
+    return 'head'
+  }
+  if (timeline.forkedFrom && sha === timeline.forkSha) {
+    return timeline.forkedFrom
+  }
+  return shortSha(sha)
 }
 
-/** forkMarkerIndex is the row the fork marker precedes, or -1 when every commit is on one side of the fork. */
-export function forkMarkerIndex(commits: readonly TimelineCommit[]): number {
-  const lastAfterFork = commits.findLastIndex(commit => commit.afterFork)
-  return lastAfterFork === -1 || lastAfterFork === commits.length - 1 ? -1 : lastAfterFork + 1
+/** baseTriggerLabel names the base commit, owning it to the parent branch only below the fork point. */
+export function baseTriggerLabel(sha: string, timeline: Timeline): CommitLabel {
+  const commit = timeline.commits.find(entry => entry.sha === sha)
+  const belowFork = commit !== undefined && !commit.afterFork && sha !== timeline.forkSha
+  return { owner: timeline.forkedFrom && belowFork ? timeline.forkedFrom : '', ref: commitRef(sha, timeline) }
 }
 
-/** timelineHeadSha is the sha sitting at the tip of the selected branch. */
-export function timelineHeadSha(selector: SelectorState): string {
-  const branch = selector.timeline?.branch
-  return selector.branches.find(summary => summary.name === branch)?.headSha ?? selector.timeline?.commits[0]?.sha ?? ''
+/** commitTone is which side of the fork a commit is coloured for, or `none` on an unforked branch. */
+export function commitTone(commit: TimelineCommit, timeline: Timeline): CommitToneName {
+  if (!timeline.forkedFrom) {
+    return 'none'
+  }
+  return commit.afterFork ? 'after' : 'before'
+}
+
+/** forkMarkerIndex is the row the fork marker precedes, or -1 when the timeline has no crossing. */
+export function forkMarkerIndex(timeline: Timeline): number {
+  if (!timeline.forkedFrom) {
+    return -1
+  }
+  const lastAfterFork = timeline.commits.findLastIndex(commit => commit.afterFork)
+  return lastAfterFork === -1 || lastAfterFork === timeline.commits.length - 1 ? -1 : lastAfterFork + 1
 }
 
 /** shortSha is the 7-character form git abbreviates a commit to. */
@@ -264,8 +262,11 @@ export function shortSha(sha: string): string {
   return sha.slice(0, 7)
 }
 
-/** CommitLabel is how one commit reads in a chip or a dropdown row. */
+/** CommitLabel is how one commit reads on a dropdown trigger. */
 export interface CommitLabel {
+  owner: string
   ref: string
-  subject: string
 }
+
+/** CommitToneName is the palette a commit row is drawn in. */
+export type CommitToneName = 'after' | 'before' | 'none'

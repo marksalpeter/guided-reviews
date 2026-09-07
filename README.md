@@ -70,26 +70,32 @@ revisions first.
 
 - **On a feature branch** you land straight in the diff. Target is that branch's head,
   base is the commit it forked from.
-- **On the default branch** there is no fork to diff against, so the pane asks you to
-  select a target branch and lists the branches off main — most recently committed
-  first, each with its commit count and how long ago it moved. Picking one sets the
-  target to that branch's head and the base to its fork point.
+- **On the default branch** there is no fork, so both selectors run over main's own
+  history: base is the previous commit, target is the head. The newest commit, in other
+  words.
 
-The toolbar carries the selectors from then on:
+The panel is scoped to one branch, named in its own line above the diff:
 
 ```
-[ main ▸ 3be4e1a ] ──→ [ feat/x ▸ head ]
+⑂ Review feat/x ▾
+[ main ▾  →  head ▾ ]
 ```
 
-The right-hand chip's branch dropdown is the only branch *choice*: it picks the branch
-under review and therefore the whole timeline. Both commit dropdowns select out of that
-one ancestry, so an incoherent pair cannot be built. The left-hand branch label is
-derived, never chosen — it names whichever branch owns the base commit you picked, so
-moving the base above the fork point re-labels it as the feature branch.
+That line is the branch dropdown — it picks the branch under review and with it the whole
+timeline. Both commit dropdowns select out of that one ancestry, so a pair spanning two
+unrelated branches cannot be expressed. Choosing a branch snaps the base back to the
+commit it forked from.
 
-Inside a commit dropdown, commits at or after the fork point are blue and the commits
-before it — the ones shared with the branch you forked from — are orange, with a marker
-ruling off where the branch diverged.
+The commits name themselves by what they are rather than by sha wherever they can. The
+tip reads `head`, the fork point reads `main` — so the resting state is `main → head`,
+with no shas at all. A sha appears once you move off those: go back past the fork and the
+base reads `main / c0e64a2`; move it up onto the branch's own commits and it is a bare
+sha, since the line above already names the branch. The full sha is on hover throughout.
+
+Inside a dropdown, commits at or after the fork point are blue and the ones before it —
+shared with the branch you forked from — are orange, with a marker ruling off where the
+branch diverged. On the default branch there is no fork, so there is no marker and no
+colour split; the rows are plain.
 
 Changing any selector re-points the same panel rather than opening a second tab, and
 each commit pair keeps its own comment log, so going back to a pair restores its

@@ -91,9 +91,6 @@ async function main(): Promise<void> {
 
   const service = new ReviewService(new Git(dir, exec))
   const selection = await service.defaultSelection()
-  if (!selection) {
-    throw new Error('demo repository should be on a feature branch')
-  }
   const key = await service.openSelection(selection)
 
   await service.startThread(key, 'src/auth.ts', 'new', 21, 'JSON.parse on attacker-controlled input — wrap this in a try/catch, a malformed token should 401 not 500.')

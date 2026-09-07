@@ -6,7 +6,7 @@ import { Git } from './git.js'
 import { GuideGenerator, type ClaudeRunner } from './guide.js'
 import type { SelectorState } from './protocol.js'
 import { ReviewStore } from './store.js'
-import type { Anchor, ChangedFile, LineAnchor, ReviewState, Thread, Timeline } from './types.js'
+import type { Anchor, ChangedFile, LineAnchor, ReviewState, Thread } from './types.js'
 
 /** commitPickerLimit is how many recent commits the two-commit picker offers. */
 export const commitPickerLimit = 50
@@ -61,27 +61,15 @@ export class ReviewService {
   }
 
   /** defaultSelection is where the panel opens: the branch's head against the commit it forked from. */
-  async defaultSelection(): Promise<Selection | null> {
-    const branch = await this.git.currentBranch()
-    const defaultName = await this.git.defaultBranchName()
-    // on the default branch there is no fork to diff against, so the panel asks for a target instead
-    if (!branch || branch === defaultName) {
-      return null
-    }
-    return {
-      branch,
-      baseSha: await this.git.mergeBase(await this.git.defaultBranch(), branch),
-      headSha: await this.git.revParse(branch),
-    }
+  async defaultSelection(): Promise<Selection> {
+    const branch = (await this.git.currentBranch()) || 'HEAD'
+    return this.selectionForBranch(branch)
   }
 
-  /** selectionForBranch pairs a newly chosen target branch with the fork point it grew from. */
+  /** selectionForBranch pairs a branch's head with the base it should open against. */
   async selectionForBranch(branch: string): Promise<Selection> {
-    return {
-      branch,
-      baseSha: await this.git.mergeBase(await this.git.defaultBranch(), branch),
-      headSha: await this.git.revParse(branch),
-    }
+    const headSha = await this.git.revParse(branch)
+    return { branch, baseSha: await this.openingBase(branch, headSha), headSha }
   }
 
   /** openSelection creates or advances the review for one selected commit pair. */
@@ -93,21 +81,13 @@ export class ReviewService {
     return this.openRangeReview(selection.baseSha, selection.headSha)
   }
 
-  /** selector builds the toolbar state, omitting the timeline until a target branch is chosen. */
-  async selector(selection: Selection | null): Promise<SelectorState> {
-    const branches = await this.git.branches()
-    const defaultName = await this.git.defaultBranchName()
-    if (!selection) {
-      const headSha = await this.git.revParse(defaultName)
-      return { branches, baseSha: headSha, headSha, baseBranch: defaultName }
-    }
-    const timeline = await this.git.timeline(selection.branch, commitPickerLimit)
+  /** selector builds the toolbar: the branch list, and the one timeline both commit pickers use. */
+  async selector(selection: Selection): Promise<SelectorState> {
     return {
-      branches,
-      timeline,
+      branches: await this.git.branches(),
+      timeline: await this.git.timeline(selection.branch, commitPickerLimit),
       baseSha: selection.baseSha,
       headSha: selection.headSha,
-      baseBranch: branchOwning(timeline, selection.baseSha),
     }
   }
 
@@ -228,6 +208,16 @@ export class ReviewService {
     }
   }
 
+  /** openingBase is the fork point a branch grew from, or its previous commit on the default branch. */
+  private async openingBase(branch: string, headSha: string): Promise<string> {
+    const defaultName = await this.git.defaultBranchName()
+    if (branch !== defaultName) {
+      return this.git.mergeBase(await this.git.defaultBranch(), branch)
+    }
+    // the default branch forked from nothing, so the newest commit is the reviewable unit
+    return (await this.git.parentOf(headSha)) ?? headSha
+  }
+
   /** isCanonical reports whether a selection is the branch's own review rather than an ad-hoc pair. */
   private async isCanonical(selection: Selection): Promise<boolean> {
     if (selection.branch !== (await this.git.currentBranch())) {
@@ -299,15 +289,6 @@ function now(): string {
 /** messageOf renders any thrown value as a string. */
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
-}
-
-/** branchOwning names the branch a selected commit belongs to, which the base chip displays. */
-function branchOwning(timeline: Timeline, sha: string): string {
-  const commit = timeline.commits.find(entry => entry.sha === sha)
-  if (commit?.afterFork) {
-    return timeline.branch
-  }
-  return timeline.forkedFrom || timeline.branch
 }
 
 /** LoadedReview pairs folded state with the diff it describes. */

@@ -1,5 +1,5 @@
 import { SystemExec, type Exec } from './exec.js'
-import type { BranchSummary, ChangedFile, CommitSummary, FileStatus, Timeline } from './types.js'
+import type { BranchSummary, ChangedFile, FileStatus, Timeline } from './types.js'
 
 /** storeDir is the review store, excluded from every diff so a review never reviews itself. */
 export const storeDir = '.guided-review'
@@ -48,6 +48,12 @@ export class Git {
   async mergeBase(a: string, b: string): Promise<string> {
     const out = await this.git(['merge-base', a, b])
     return out.trim()
+  }
+
+  /** parentOf is a commit's first parent, or null at the root of history. */
+  async parentOf(rev: string): Promise<string | null> {
+    const out = await this.tryGit(['rev-parse', '--verify', '--quiet', `${rev}^1^{commit}`])
+    return out ? out.trim() : null
   }
 
   /** revParse resolves any revspec to a full sha, throwing when it does not exist. */
@@ -122,12 +128,6 @@ export class Git {
     return full.replace(/^[^/]+\//, '')
   }
 
-  /** localBranches lists every local branch name, current branch first. */
-  async localBranches(): Promise<string[]> {
-    const out = await this.git(['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
-    return out.split('\n').map(l => l.trim()).filter(Boolean)
-  }
-
   /** branches lists local branches for the picker: the default branch first, then by newest commit. */
   async branches(): Promise<BranchSummary[]> {
     const defaultName = await this.defaultBranchName()
@@ -167,18 +167,6 @@ export class Git {
         return { sha, subject, author, when, afterFork: after.has(sha) }
       })
     return { branch, forkedFrom: isDefault ? '' : forkedFrom, forkSha, commits }
-  }
-
-  /** recentCommits lists the newest commits reachable from HEAD. */
-  async recentCommits(limit: number): Promise<CommitSummary[]> {
-    const out = await this.git(['log', `-${limit}`, '--format=%H%x00%s%x00%an%x00%ar'])
-    return out
-      .split('\n')
-      .filter(Boolean)
-      .map(line => {
-        const [sha = '', subject = '', author = '', when = ''] = line.split('\0')
-        return { sha, subject, author, when }
-      })
   }
 
   /** aheadCount is how many commits a branch carries that its base does not. */

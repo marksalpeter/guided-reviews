@@ -97,14 +97,6 @@ describe('Git', () => {
     expect(renamed?.path).toBe('moved.ts')
   })
 
-  it('lists local branches and recent commits', async () => {
-    expect(await git.localBranches()).toEqual(expect.arrayContaining(['main', 'feature']))
-    const commits = await git.recentCommits(5)
-    expect(commits.length).toBeGreaterThan(0)
-    expect(commits[0]?.sha).toMatch(/^[0-9a-f]{40}$/)
-    expect(commits[0]?.subject).toBeTruthy()
-  })
-
   it('falls back through default-branch candidates when no origin exists', async () => {
     expect(await git.defaultBranch()).toBe('main')
   })

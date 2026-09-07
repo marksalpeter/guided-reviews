@@ -14,14 +14,13 @@ export class ReviewPanel {
   private panel: vscode.WebviewPanel
   private service: ReviewService
   private assets: vscode.Uri
-  private selection: Selection | null
-  /** key is the review the selection resolves to, empty until a target branch is chosen. */
+  private selection: Selection
   private key = ''
   private disposables: vscode.Disposable[] = []
   private guideBusy = false
   private guideAttempted = false
 
-  private constructor(panel: vscode.WebviewPanel, service: ReviewService, selection: Selection | null, assets: vscode.Uri) {
+  private constructor(panel: vscode.WebviewPanel, service: ReviewService, selection: Selection, assets: vscode.Uri) {
     this.panel = panel
     this.service = service
     this.selection = selection
@@ -35,7 +34,7 @@ export class ReviewPanel {
   }
 
   /** show opens or focuses this repository's panel on a selection. */
-  static show(service: ReviewService, selection: Selection | null, assets: vscode.Uri): ReviewPanel {
+  static show(service: ReviewService, selection: Selection, assets: vscode.Uri): ReviewPanel {
     const existing = ReviewPanel.open.get(service.repo.repoRoot)
     if (existing) {
       existing.panel.reveal()
@@ -50,7 +49,7 @@ export class ReviewPanel {
   }
 
   /** adopt attaches a panel VS Code restored on startup to a live selection. */
-  static adopt(panel: vscode.WebviewPanel, service: ReviewService, selection: Selection | null, assets: vscode.Uri): ReviewPanel {
+  static adopt(panel: vscode.WebviewPanel, service: ReviewService, selection: Selection, assets: vscode.Uri): ReviewPanel {
     const created = new ReviewPanel(panel, service, selection, assets)
     ReviewPanel.open.set(service.repo.repoRoot, created)
     void created.retarget(selection)
@@ -61,11 +60,9 @@ export class ReviewPanel {
   async push(): Promise<void> {
     try {
       const selector = await this.service.selector(this.selection)
-      const payload: ReviewPayload = { selector, guideBusy: this.guideBusy }
-      if (this.key) {
-        const { state, files } = await this.service.load(this.key)
-        payload.review = { state, files, diff: await this.service.repo.unifiedDiff(state.refs.baseSha, state.refs.headSha) }
-      }
+      const { state, files } = await this.service.load(this.key)
+      const diff = await this.service.repo.unifiedDiff(state.refs.baseSha, state.refs.headSha)
+      const payload: ReviewPayload = { review: { state, files, diff }, selector, guideBusy: this.guideBusy }
       this.send({ type: 'review', payload })
     } catch (error) {
       this.send({ type: 'error', message: messageOf(error) })
@@ -73,10 +70,10 @@ export class ReviewPanel {
   }
 
   /** retarget re-points the open panel at another commit pair, replacing what it was showing. */
-  private async retarget(selection: Selection | null): Promise<void> {
+  private async retarget(selection: Selection): Promise<void> {
     this.selection = selection
     // a different pair is a different event log, so the guide attempt has to be reconsidered
-    this.key = selection ? await this.service.openSelection(selection) : ''
+    this.key = await this.service.openSelection(selection)
     this.guideAttempted = false
     this.panel.title = titleFor(selection)
     await this.push()
@@ -93,9 +90,9 @@ export class ReviewPanel {
         case 'selectBranch':
           return await this.retarget(await this.service.selectionForBranch(message.branch))
         case 'selectBase':
-          return await this.retarget(this.selection && { ...this.selection, baseSha: message.sha })
+          return await this.retarget({ ...this.selection, baseSha: message.sha })
         case 'selectTarget':
-          return await this.retarget(this.selection && { ...this.selection, headSha: message.sha })
+          return await this.retarget({ ...this.selection, headSha: message.sha })
         case 'startThread':
           await this.service.startThread(this.key, message.path, message.side, message.line, message.body, message.endLine)
           break
@@ -240,9 +237,9 @@ export class ReviewPanel {
   }
 }
 
-/** titleFor names the tab after the branch under review, or invites one to be chosen. */
-function titleFor(selection: Selection | null): string {
-  return selection ? `Review ${selection.branch}` : 'Review'
+/** titleFor names the tab after the branch under review. */
+function titleFor(selection: Selection): string {
+  return `Review ${selection.branch}`
 }
 
 /** debounce collapses a burst of file-watcher events into one reload. */

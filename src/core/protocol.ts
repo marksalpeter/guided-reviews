@@ -10,18 +10,14 @@ export interface LoadedDiff {
 /** SelectorState drives the toolbar: one branch choice, and the two commits picked from its ancestry. */
 export interface SelectorState {
   branches: BranchSummary[]
-  /** timeline is absent until a target branch is chosen, which only happens on the default branch. */
-  timeline?: Timeline
+  timeline: Timeline
   baseSha: string
   headSha: string
-  /** baseBranch is derived, never chosen: whichever branch owns the selected base commit. */
-  baseBranch: string
 }
 
 /** ReviewPayload is everything the webview needs to render one review. */
 export interface ReviewPayload {
-  /** review is absent while the default branch is checked out and no target branch has been picked. */
-  review?: LoadedDiff
+  review: LoadedDiff
   selector: SelectorState
   guideBusy: boolean
 }
