@@ -115,15 +115,15 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   min-width: 0;
   margin: -2px 6px -2px -2px;
   padding: 2px 0 2px 2px;
-  background: var(--vscode-panel-border);
+  background: color-mix(in srgb, var(--vscode-panel-border) 50%, var(--vscode-editor-background));
   border-right: 1px solid var(--vscode-editor-background);
   border-radius: 999px 3px 3px 999px;
 }
 
 /* the state belongs to the whole segment, not to the chip inside it */
-.gr-branch:hover { background: color-mix(in srgb, var(--vscode-panel-border) 88%, var(--vscode-foreground)); }
+.gr-branch:hover { background: var(--vscode-panel-border); }
 .gr-branch:has(.gr-chip[aria-expanded='true']) {
-  background: color-mix(in srgb, var(--vscode-panel-border) 76%, var(--vscode-foreground));
+  background: color-mix(in srgb, var(--vscode-panel-border) 82%, var(--vscode-foreground));
 }
 .gr-branch .gr-chip:hover { background: transparent; }
 
@@ -138,7 +138,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   gap: 6px;
   min-width: 0;
   max-width: 260px;
-  padding: 6px 10px;
+  padding: 7px 10px 5px;
   white-space: nowrap;
   color: var(--vscode-foreground);
   background: transparent;
