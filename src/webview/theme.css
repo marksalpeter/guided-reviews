@@ -157,7 +157,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 .gr-chip-branch .gr-chip-value { font-weight: 600; }
 
-.gr-caret { flex: 0 0 auto; color: var(--vscode-descriptionForeground); }
+.gr-caret { flex: 0 0 auto; color: var(--gr-faint); }
 
 /* never overflow: hidden on an ancestor — the popups hang out of the toolbar */
 .gr-popup {
