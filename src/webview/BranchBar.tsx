@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState, type ReactNode, type RefObject }
 
 import type { SelectorState } from '../core/protocol.js'
 import type { BranchSummary, Timeline, TimelineCommit } from '../core/types.js'
+import { Caret } from './Caret.js'
 import { post } from './vscodeApi.js'
 
 /** BranchBar is the toolbar's picker row: the branch compared against, then the two commits bracketing the diff. */
@@ -12,10 +13,8 @@ export const BranchBar = ({ selector }: { selector: SelectorState }) => {
 
   return (
     <div className="gr-branchbar">
-      <ForkGlyph />
-      <BranchPicker branches={selector.branches} baseBranch={selector.baseBranch} />
-      <span className="gr-sep" aria-hidden="true">
-        /
+      <span className="gr-branch">
+        <BranchPicker branches={selector.branches} baseBranch={selector.baseBranch} />
       </span>
       <CommitPicker
         role="base"
@@ -45,7 +44,12 @@ const BranchPicker = ({ branches, baseBranch }: { branches: readonly BranchSumma
   <Dropdown
     className="gr-chip gr-chip-branch"
     title={baseBranch}
-    trigger={<span className="gr-chip-value">{baseBranch}</span>}
+    trigger={
+      <>
+        <ForkGlyph />
+        <span className="gr-chip-value">{baseBranch}</span>
+      </>
+    }
   >
     {close =>
       branches.map(summary => (
@@ -80,6 +84,7 @@ const BranchRow = ({
     title={summary.name}
     onClick={onSelect}
   >
+    <ForkGlyph />
     <span className="gr-row-name">{summary.name}</span>
     {summary.isDefault && <Pill label="default" />}
     <span className="gr-row-when">{summary.when}</span>
@@ -107,7 +112,7 @@ const CommitPicker = ({
     <Dropdown
       className="gr-chip"
       title={selectedSha}
-      ariaLabel={commitPill(selectedSha, timeline) === 'merge-base' ? mergeBaseLabel(baseBranch) : undefined}
+      ariaLabel={commitPill(selectedSha, timeline) === 'base' ? baseLabel(baseBranch) : undefined}
       trigger={<span className="gr-chip-value">{chipLabel(selectedSha, timeline)}</span>}
     >
       {close =>
@@ -167,7 +172,10 @@ const CommitRow = ({
 /** ForkMarker rules off the commits shared with the branch this one grew out of. */
 const ForkMarker = ({ forkedFrom }: { forkedFrom: string }) => (
   <div className="gr-fork-marker" aria-hidden="true">
-    <span className="gr-fork-label">forked from {forkedFrom}</span>
+    <span className="gr-fork-label">
+      <ForkGlyph />
+      {forkedFrom}
+    </span>
     <span className="gr-fork-rule" />
   </div>
 )
@@ -187,13 +195,6 @@ const ForkGlyph = () => (
       <circle cx="42" cy="96" r="13" />
       <circle cx="82" cy="42" r="13" />
     </g>
-  </svg>
-)
-
-/** Caret is the flat triangle every chip trigger ends in. */
-const Caret = () => (
-  <svg className="gr-caret" viewBox="0 0 10 6" width="9" height="5" aria-hidden="true">
-    <path d="M0 0.6 L10 0.6 L5 6 Z" fill="currentColor" />
   </svg>
 )
 
@@ -262,7 +263,7 @@ function useDismiss(root: RefObject<HTMLElement | null>, open: boolean, onDismis
   }, [root, open, onDismiss])
 }
 
-/** chipLabel names a commit on a chip: `head` at the tip, `merge-base` at the fork point, else a short sha. */
+/** chipLabel names a commit on a chip: `head` at the tip, `base` at the fork point, else a short sha. */
 export function chipLabel(sha: string, timeline: Timeline): string {
   return commitPill(sha, timeline) || shortSha(sha)
 }
@@ -273,7 +274,7 @@ export function commitPill(sha: string, timeline: Timeline): CommitPillName | ''
     return 'head'
   }
   if (sha !== '' && sha === timeline.forkSha) {
-    return 'merge-base'
+    return 'base'
   }
   return ''
 }
@@ -313,9 +314,9 @@ function commitIndex(sha: string, timeline: Timeline): number {
   return timeline.commits.findIndex(commit => commit.sha === sha)
 }
 
-/** mergeBaseLabel spells out for screen readers what the merge-base chip points at. */
-function mergeBaseLabel(baseBranch: string): string {
-  return `merge-base, where this branch forked from ${baseBranch}`
+/** baseLabel spells out for screen readers what the base chip points at. */
+function baseLabel(baseBranch: string): string {
+  return `base, the merge base where this branch forked from ${baseBranch}`
 }
 
 /** rowClassName assembles the classes one commit row is drawn with. */
@@ -327,7 +328,7 @@ function rowClassName(tone: CommitToneName, selected: boolean, reachable: boolea
 export type PickerRole = 'base' | 'target'
 
 /** CommitPillName is the pill a special commit row carries. */
-export type CommitPillName = 'head' | 'merge-base'
+export type CommitPillName = 'head' | 'base'
 
 /** CommitToneName is the palette a commit row is drawn in. */
 export type CommitToneName = 'after' | 'before' | 'none'

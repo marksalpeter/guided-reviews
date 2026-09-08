@@ -14,6 +14,7 @@ import {
   type RenderToken,
 } from 'react-diff-view'
 import type { ChangedFile, Thread } from '../core/types.js'
+import { Caret } from './Caret.js'
 import { CommentThread, NewCommentBox } from './CommentThread.js'
 import { languageForPath, plaintext, type RefractorLike } from './highlight.js'
 import { classNameOf, markClassName, styleOf } from './tokens.js'
@@ -49,8 +50,13 @@ export const FileDiff = ({
   return (
     <section className={`gr-file${reviewed ? ' reviewed' : ''}`} id={fileAnchorId(pathOf(file))}>
       <header className="gr-file-header">
-        <button className="gr-caret" aria-label={hidden ? 'Expand' : 'Collapse'} onClick={onToggleCollapsed}>
-          {hidden ? '▸' : '▾'}
+        <button
+          className="gr-file-toggle"
+          aria-label={hidden ? 'Expand' : 'Collapse'}
+          aria-expanded={!hidden}
+          onClick={onToggleCollapsed}
+        >
+          <Caret />
         </button>
         <strong>{displayPath(file)}</strong>
         <span className="gr-spacer" />

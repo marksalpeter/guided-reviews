@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest'
-import { chipLabel, commitPill, commitTone, forkMarkerIndex, isReachable, shortSha } from './BranchBar.js'
+// @vitest-environment jsdom
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, cleanup } from '@testing-library/react'
+import type { SelectorState } from '../core/protocol.js'
 import type { Timeline, TimelineCommit } from '../core/types.js'
+import { BranchBar, chipLabel, commitPill, commitTone, forkMarkerIndex, isReachable, shortSha } from './BranchBar.js'
+
+vi.mock('./vscodeApi.js', () => ({ post: vi.fn() }))
 
 const commit = (sha: string, subject: string, afterFork: boolean): TimelineCommit => ({
   sha,
@@ -29,13 +34,31 @@ const unforked: Timeline = {
   commits: [commit('f00ba12aaaa', 'add the picker', false), commit('9dd4e5cffff', 'wire the protocol', false)],
 }
 
+const selector: SelectorState = {
+  branches: [{ name: 'main', headSha: 'f00ba12aaaa', when: '2 hours ago', ahead: 0, isDefault: true }],
+  timeline: forked,
+  baseBranch: 'main',
+  baseSha: 'c31de0bbbbb',
+  headSha: 'f00ba12aaaa',
+}
+
+describe('BranchBar', () => {
+  afterEach(cleanup)
+
+  it('announces the base chip as the merge base and the branch it forked from', () => {
+    render(<BranchBar selector={selector} />)
+
+    expect(screen.getByLabelText('base, the merge base where this branch forked from main')).toBeTruthy()
+  })
+})
+
 describe('chipLabel', () => {
   it('reads as head at the tip of the branch', () => {
     expect(chipLabel('f00ba12aaaa', forked)).toBe('head')
   })
 
-  it('reads as merge-base at the fork point', () => {
-    expect(chipLabel('c31de0bbbbb', forked)).toBe('merge-base')
+  it('reads as base at the fork point', () => {
+    expect(chipLabel('c31de0bbbbb', forked)).toBe('base')
   })
 
   it('reads as a short sha anywhere else', () => {
@@ -53,8 +76,8 @@ describe('commitPill', () => {
     expect(commitPill('f00ba12aaaa', forked)).toBe('head')
   })
 
-  it('pills the merge base', () => {
-    expect(commitPill('c31de0bbbbb', forked)).toBe('merge-base')
+  it('pills the merge base as base', () => {
+    expect(commitPill('c31de0bbbbb', forked)).toBe('base')
   })
 
   it('leaves an ordinary commit unpilled', () => {
