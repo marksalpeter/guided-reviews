@@ -28,6 +28,7 @@ export interface ReviewPayload {
 /** HostMessage is sent from the extension host to the webview. */
 export type HostMessage =
   | { type: 'review'; payload: ReviewPayload }
+  | { type: 'source'; blob: string; text: string }
   | { type: 'error'; message: string }
 
 /** ViewMessage is sent from the webview to the extension host. */
@@ -46,4 +47,5 @@ export type ViewMessage =
   | { type: 'unmarkReviewed'; path: string }
   | { type: 'reviewFiles'; files: { path: string; blob: string }[]; reviewed: boolean }
   | { type: 'generateGuide' }
+  | { type: 'loadSource'; blob: string }
   | { type: 'openFile'; path: string; line: number }

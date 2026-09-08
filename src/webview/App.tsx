@@ -5,6 +5,7 @@ import type { HostMessage, LoadedDiff, ReviewPayload } from '../core/protocol.js
 import type { Guide, GuideGroup, Thread } from '../core/types.js'
 import { BranchBar } from './BranchBar.js'
 import { CommentThread, threadElementId } from './CommentThread.js'
+import { sourceLines } from './expand.js'
 import { FileDiff, fileAnchorId, pathOf } from './FileDiff.js'
 import { FileList, isReviewed, reviewedCount } from './FileList.js'
 import { GuideStatus } from './GuideStatus.js'
@@ -25,8 +26,14 @@ export const App = () => {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(loadViewState().collapsed ?? []))
   // a deep-linked comment must be on screen even in a file the reader has collapsed or ticked off
   const [forced, setForced] = useState<Set<string>>(new Set())
+  // base texts arrive one blob at a time, and outlive the payload that asked for them
+  const [sources, setSources] = useState<Record<string, string[]>>({})
 
-  useHostMessages(setPayload, setFatal)
+  const addSource = useCallback(
+    (blob: string, text: string) => setSources(previous => ({ ...previous, [blob]: sourceLines(text) })),
+    [],
+  )
+  useHostMessages(setPayload, setFatal, addSource)
   useEffect(() => saveViewState({ mode, collapsed: [...collapsed] }), [mode, collapsed])
 
   // the host sends a fresh payload object on every action, so both memos key on the text they parse
@@ -88,6 +95,7 @@ export const App = () => {
                     meta={meta}
                     threads={threadsForPath(state.threads, path)}
                     refractor={refractor}
+                    source={meta?.oldBlob ? sources[meta.oldBlob] : undefined}
                     reviewed={isReviewed(reviewedBlobs[path], meta?.newBlob)}
                     collapsed={collapsed.has(path)}
                     forced={forced.has(path)}
@@ -273,11 +281,17 @@ function useRefractor(files: FileData[]): RefractorLike | null {
 }
 
 /** useHostMessages subscribes to the extension host and announces readiness once. */
-function useHostMessages(onReview: (payload: ReviewPayload) => void, onError: (message: string) => void): void {
+function useHostMessages(
+  onReview: (payload: ReviewPayload) => void,
+  onError: (message: string) => void,
+  onSource: (blob: string, text: string) => void,
+): void {
   useEffect(() => {
     const listener = (event: MessageEvent<HostMessage>) => {
       if (event.data.type === 'review') {
         onReview(event.data.payload)
+      } else if (event.data.type === 'source') {
+        onSource(event.data.blob, event.data.text)
       } else if (event.data.type === 'error') {
         onError(event.data.message)
       }
@@ -285,7 +299,7 @@ function useHostMessages(onReview: (payload: ReviewPayload) => void, onError: (m
     window.addEventListener('message', listener)
     post({ type: 'ready' })
     return () => window.removeEventListener('message', listener)
-  }, [onReview, onError])
+  }, [onReview, onError, onSource])
 }
 
 /** useChapters groups the diff under its guide chapters, or into one bare chapter without a guide. */

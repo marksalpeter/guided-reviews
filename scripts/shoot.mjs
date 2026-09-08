@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { join, extname } from 'node:path'
 
-const payload = JSON.parse(await readFile('scripts/payload.json', 'utf8'))
+const { sources = {}, ...payload } = JSON.parse(await readFile('scripts/payload.json', 'utf8'))
 
 // VS Code hands webviews the whole theme as CSS variables; these are Dark+ / Light+ values.
 const themes = {
@@ -59,9 +59,14 @@ html,body{height:100%}</style>
 <div id="root"></div>
 <script>
   const payload = ${JSON.stringify(payload)};
+  const sources = ${JSON.stringify(sources)};
   let saved = {};
+  const reply = (message) => setTimeout(() => window.postMessage(message, '*'), 0);
   window.acquireVsCodeApi = () => ({
-    postMessage: (m) => { if (m.type === 'ready') setTimeout(() => window.postMessage({type:'review', payload}, '*'), 0) },
+    postMessage: (m) => {
+      if (m.type === 'ready') reply({type:'review', payload});
+      if (m.type === 'loadSource') reply({type:'source', blob: m.blob, text: sources[m.blob] ?? ''});
+    },
     setState: (s) => { saved = s }, getState: () => saved,
   });
 </script>

@@ -6,6 +6,36 @@ import { Git } from '../src/core/git.js'
 import { ClaudeCli } from '../src/core/guide.js'
 import { ReviewService } from '../src/core/review.js'
 
+/** serverTail is the half of the server this branch never touches, so its diff has a run to fold. */
+const serverTail = [
+  '/** notFound is the fallback for a path no route claims. */',
+  'export function notFound(): Response {',
+  '  return new Response("not found", { status: 404 })',
+  '}',
+  '',
+  '/** health answers the load balancer without reading a session at all. */',
+  'export function health(): Response {',
+  '  return Response.json({ ok: true })',
+  '}',
+  '',
+  '/** cors adds the headers a browser wants before it will read a reply. */',
+  'export function cors(response: Response): Response {',
+  '  response.headers.set("access-control-allow-origin", "*")',
+  '  response.headers.set("access-control-allow-headers", "authorization")',
+  '  return response',
+  '}',
+  '',
+  '/** logged prints one line per request, which is all the logging this service has. */',
+  'export function logged(req: Request, response: Response): Response {',
+  '  console.log(req.method + " " + new URL(req.url).pathname + " " + response.status)',
+  '  return response',
+  '}',
+  '',
+  '/** port is where the service listens, unless the environment says otherwise. */',
+  'export const port = Number(process.env.PORT ?? 8080)',
+  '',
+]
+
 const files: Record<string, string> = {
   'src/auth.ts': [
     'import { createHash } from "node:crypto"',
@@ -49,6 +79,7 @@ const files: Record<string, string> = {
     '  return Response.json({ hello: session.userId })',
     '}',
     '',
+    ...serverTail,
   ].join('\n'),
   'src/routes.ts': [
     'import { handle } from "./server"',
@@ -71,7 +102,8 @@ async function main(): Promise<void> {
   await exec.run('git', ['config', 'user.name', 'Demo'])
 
   await mkdir(join(dir, 'src'), { recursive: true })
-  await writeFile(join(dir, 'src/server.ts'), 'export function handle(req: Request): Response {\n  return Response.json({ hello: "world" })\n}\n')
+  const baseServer = ['export function handle(req: Request): Response {', '  return Response.json({ hello: "world" })', '}', '', ...serverTail]
+  await writeFile(join(dir, 'src/server.ts'), baseServer.join('\n'))
   await writeFile(join(dir, 'package.json'), '{\n  "name": "demo",\n  "version": "1.0.0",\n  "type": "module"\n}\n')
   await writeFile(join(dir, 'README.md'), '# demo\n\nA tiny service.\n')
   await exec.run('git', ['add', '-A'])
@@ -118,7 +150,13 @@ async function main(): Promise<void> {
     process.stderr.write(`  ${group.title}\n    ${group.summary}\n    ${group.files.join(', ')}\n`)
   }
 
-  const payload = { review: { state, files: changed, diff }, selector, guideBusy: false }
+  // the shooters' harness answers loadSource out of this map, the way the panel answers it from git
+  const sources: Record<string, string> = {}
+  for (const file of changed.filter(file => file.oldBlob && !file.binary)) {
+    sources[file.oldBlob ?? ''] = await service.repo.blobText(file.oldBlob ?? '')
+  }
+
+  const payload = { review: { state, files: changed, diff }, selector, guideBusy: false, sources }
   await writeFile('scripts/payload.json', JSON.stringify(payload, null, 2))
   process.stderr.write('\nwrote scripts/payload.json\n')
   await rm(dir, { recursive: true, force: true })

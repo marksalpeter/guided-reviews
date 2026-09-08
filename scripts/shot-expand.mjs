@@ -11,13 +11,22 @@ const types={'.js':'text/javascript','.css':'text/css','.map':'application/json'
 const server=createServer(async(req,res)=>{const url=(req.url??'/').split('?')[0]
  if(url.startsWith('/h')){res.writeHead(200,{'Content-Type':'text/html'});res.end(harness);return}
  try{const b=await readFile(join('dist/webview',url));res.writeHead(200,{'Content-Type':types[extname(url)]??'application/octet-stream'});res.end(b)}catch{res.writeHead(404);res.end()}})
-await new Promise(r=>server.listen(4324,r))
+await new Promise(r=>server.listen(4325,r))
 const browser=await chromium.launch({args:['--no-sandbox']})
 const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:2})
-await page.goto('http://localhost:4324/h',{waitUntil:'networkidle'})
-await page.waitForSelector('.gr-file')
-await page.evaluate(() => { document.querySelector('.gr-main').scrollTop = 300 })
+await page.goto('http://localhost:4325/h',{waitUntil:'networkidle'})
+await page.waitForSelector('.gr-expander')
+// one step already taken, so the row carries both halves of the control: what is left, and the way back
+await page.getByLabel('Expand down').first().click()
+await page.waitForTimeout(300)
+const row = page.locator('.gr-expander').first()
+await row.scrollIntoViewIfNeeded()
 await page.waitForTimeout(400)
-await page.screenshot({ path: 'media/screenshot-sticky.png' })
+const box = await row.boundingBox()
+const file = await page.locator('.gr-file').filter({ has: page.locator('.gr-expander') }).first().boundingBox()
+await page.screenshot({
+  path: 'media/screenshot-expand.png',
+  clip: { x: file.x, y: box.y - 96, width: file.width, height: box.height + 108 },
+})
 await browser.close(); server.close()
-console.log('wrote media/screenshot-sticky.png')
+console.log('wrote media/screenshot-expand.png')

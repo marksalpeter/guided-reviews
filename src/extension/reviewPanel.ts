@@ -189,6 +189,8 @@ export class ReviewPanel {
           break
         case 'generateGuide':
           return await this.generateGuide()
+        case 'loadSource':
+          return await this.sendSource(message.blob)
         case 'openFile':
           return await this.openFile(message.path, message.line)
       }
@@ -236,6 +238,15 @@ export class ReviewPanel {
       if (this.key === generating) {
         await this.push()
       }
+    }
+  }
+
+  /** sendSource hands the webview one blob's text, so the diff can open the lines it left out. */
+  private async sendSource(blob: string): Promise<void> {
+    try {
+      this.send({ type: 'source', blob, text: await this.service.repo.blobText(blob) })
+    } catch {
+      // a blob that will not read simply leaves that file's unchanged lines shut
     }
   }
 

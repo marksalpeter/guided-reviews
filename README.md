@@ -17,6 +17,17 @@ You can start a guided review in three ways:
 
 3. **Ask your agent.** Say "let me review this branch" or "let me review this commit".
 
+## How to read the diff
+
+**Open the lines the diff left out.** Every run of unchanged code between hunks carries a
+row saying how many lines it hides. Its arrow reveals twenty at a time from the edge it
+points at, and the count itself opens the whole run at once.
+
+**Shut it again.** The same row offers the way back, so a file returns to the change it is
+actually about. A run holding a comment thread stays open far enough to show it.
+
+![A run of unchanged lines opened between two hunks, the row below it offering the four lines still hidden and the way back](media/screenshot-expand.png)
+
 ## How to send feedback to agents
 
 **Leave comments on the lines they belong to.** Click a line number, write the comment.
@@ -68,10 +79,12 @@ function that both the panel and the CLI use — so they cannot disagree. Append
 is taken only for larger records.
 
 **The diff renders through `react-diff-view`** in unified mode, with comment threads
-anchored via its `widgets` API. Syntax highlighting is Shiki running the same TextMate
-grammars VS Code itself uses, bridged into the library's refractor-shaped hook. Every
-colour and font comes from `--vscode-*` theme variables, so the panel looks native in
-any theme.
+anchored via its `widgets` API. Opening the lines around a hunk asks the host for the base
+blob and rebuilds that hunk from it — the reveals are held per run rather than baked into
+the hunks, so collapsing puts the file back exactly as the patch had it. Syntax
+highlighting is Shiki running the same TextMate grammars VS Code itself uses, bridged into
+the library's refractor-shaped hook. Every colour and font comes from `--vscode-*` theme
+variables, so the panel looks native in any theme.
 
 ![The same review under a light theme, every colour taken from the editor's own variables](media/screenshot-light.png)
 

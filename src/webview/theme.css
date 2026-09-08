@@ -514,6 +514,42 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .diff-code-edit, .diff-code-mark { border-radius: 2px; }
 .diff-decoration { color: var(--vscode-descriptionForeground); background: var(--vscode-editor-background); }
 
+/* the row standing in for the lines the diff left out, and the controls that open and shut them */
+.gr-expander td {
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border-top: 1px solid var(--vscode-panel-border);
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.gr-expander-arrows { display: flex; justify-content: center; gap: 2px; padding: 1px 0; }
+
+.gr-expander-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  padding: 0;
+  background: transparent;
+  border-radius: var(--gr-radius);
+}
+
+.gr-expander-arrow:hover { background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground)); }
+.gr-expander-arrow:hover .gr-caret { color: var(--vscode-foreground); }
+/* the same flat triangle the file headers use, turned to point back up the file */
+.gr-expander-arrow.up .gr-caret { transform: rotate(180deg); }
+
+.gr-expander-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 2px 10px;
+  font-family: var(--vscode-font-family);
+  font-size: 11px;
+}
+
+.gr-expander-label { background: transparent; color: var(--vscode-descriptionForeground); padding: 1px 0; }
+.gr-expander-label:hover { background: transparent; color: var(--vscode-foreground); text-decoration: underline; }
+
 /* ── threads ───────────────────────────────────────────────────────────── */
 
 .gr-widget { padding: 8px 10px 10px 52px; border-top: 1px solid var(--vscode-panel-border); border-bottom: 1px solid var(--vscode-panel-border); }

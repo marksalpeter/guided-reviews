@@ -12,10 +12,11 @@ npx tsx scripts/demo.ts          # scripts/payload.json, the fixture review — 
 node scripts/shoot.mjs           # media/screenshot-dark.png, media/screenshot-light.png
 node scripts/shot-scrolled.mjs   # media/screenshot-sticky.png
 node scripts/shot-loading.mjs    # media/screenshot-loading.png
+node scripts/shot-expand.mjs     # media/screenshot-expand.png
 ```
 
 `scripts/payload.json` is gitignored. Regenerate it only when it is missing or the
-fixture itself changes; the three shooters read whatever is already there.
+fixture itself changes; the four shooters read whatever is already there.
 
 ## Verifying a UI change
 
