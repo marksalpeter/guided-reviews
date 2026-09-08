@@ -106,7 +106,7 @@
     "lint": "eslint src",
     "test": "vitest run",
     "test:watch": "vitest",
-    "package": "npm run build && vsce package",
+    "package": "npm run build && vsce package --no-rewrite-relative-links",
     "vscode:prepublish": "npm run build"
   },
   "devDependencies": {

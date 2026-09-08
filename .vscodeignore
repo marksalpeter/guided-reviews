@@ -17,4 +17,4 @@ esbuild.mjs
 eslint.config.mjs
 scripts/**
 media/icon.svg
-media/screenshot-*.png
+media/screenshot-loading.png
