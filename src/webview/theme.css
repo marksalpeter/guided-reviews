@@ -5,6 +5,8 @@
   --gr-radius: 4px;
   --gr-card-radius: 10px;
   --gr-summary-width: 300px;
+  /* the page's side gutter, kept as a name because the content and the pill share it */
+  --gr-gutter: 18px;
 
   /* positional commit colours: after the fork is blue, before it orange */
   --gr-after: var(--vscode-textLink-foreground, #4daafc);
@@ -74,9 +76,12 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   display: flex;
   align-items: center;
   gap: var(--gr-gap);
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--vscode-panel-border);
+  /* just inside the editor tabs above, rather than out on the content's own gutter */
+  padding: 4px 8px;
   background: var(--vscode-editor-background);
+  /* the bar's own background falls a few pixels past its edge instead of a rule, so content
+     passing under it fades out rather than meeting a line */
+  box-shadow: 0 8px 12px -4px var(--vscode-editor-background);
   position: sticky;
   top: 0;
   z-index: 5;
@@ -85,13 +90,11 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .gr-spacer { flex: 1; }
 
 .gr-modes { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--vscode-panel-border); border-radius: 999px; }
-/* a pixel of the padding moves above the label: neither Guided nor Diff has a descender, so
-   the space a line box reserves under the baseline would otherwise sit there empty */
-.gr-modes button { background: transparent; color: var(--vscode-foreground); border-radius: 999px; padding: 7px 14px 5px; }
+.gr-modes button { background: transparent; color: var(--vscode-foreground); border-radius: 999px; padding: 5px 14px; }
 .gr-modes button[aria-pressed='true'] { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
 
 .gr-body { display: flex; flex: 1; min-height: 0; }
-.gr-main { flex: 1; min-width: 0; overflow: auto; padding: 0 18px 40vh; }
+.gr-main { flex: 1; min-width: 0; overflow: auto; padding: 0 var(--gr-gutter) 40vh; }
 
 /* ── branch bar ────────────────────────────────────────────────────────── */
 
@@ -102,7 +105,8 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   align-items: center;
   gap: 3px;
   min-width: 0;
-  padding: 2px;
+  /* the branch segment fills the left end, so only the right end needs the pill's own inset */
+  padding: 2px 5px 2px 2px;
   border: 1px solid var(--vscode-panel-border);
   border-radius: 999px;
 }
@@ -113,7 +117,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   align-items: center;
   align-self: stretch;
   min-width: 0;
-  margin: -2px 6px -2px -2px;
+  margin: -2px 2px -2px -2px;
   padding: 2px 0 2px 2px;
   background: color-mix(in srgb, var(--vscode-panel-border) 50%, var(--vscode-editor-background));
   border-right: 1px solid var(--vscode-editor-background);
@@ -128,7 +132,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .gr-branch .gr-chip:hover { background: transparent; }
 
 .gr-glyph { flex: 0 0 auto; color: var(--vscode-charts-purple, #8b5cf6); }
-.gr-sep { flex: 0 0 auto; padding: 0 3px; color: var(--vscode-descriptionForeground); }
+.gr-sep { flex: 0 0 auto; display: flex; align-items: center; padding: 0 2px; color: var(--gr-faint); }
 
 .gr-dropdown { position: relative; display: flex; min-width: 0; }
 
@@ -138,7 +142,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   gap: 6px;
   min-width: 0;
   max-width: 260px;
-  padding: 7px 10px 5px;
+  padding: 5px 10px;
   white-space: nowrap;
   color: var(--vscode-foreground);
   background: transparent;
@@ -155,6 +159,8 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   font-variant-numeric: tabular-nums;
 }
 
+/* the segment already pads the pill's left end, so the mark sits closer to it than a chip's label would */
+.gr-chip-branch { gap: 5px; padding-left: 5px; }
 .gr-chip-branch .gr-chip-value { font-weight: 600; }
 
 .gr-caret { flex: 0 0 auto; color: var(--gr-faint); }
@@ -270,7 +276,14 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 .gr-chapter-summary { height: 100%; }
 .gr-chapter-files { min-width: 0; }
-.gr-chapter-sticky { position: sticky; top: 14px; padding: 18px 0 0; }
+/* the sticky offset is the padding itself, not an offset on top of it: a chapter that
+   collapses shorter than its own summary releases the stick, and any gap between the two
+   would show up as the title jumping when the last file is ticked off */
+.gr-chapter-sticky { position: sticky; top: 0; padding: 18px 0 0; }
+
+/* the diff view's one chapter has no title, so the space a heading would need is just a gap */
+.gr-chapter:not(:has(.gr-group-title)) .gr-chapter-sticky { padding-top: 8px; }
+.gr-chapter:not(:has(.gr-group-title)) .gr-file:first-child { margin-top: 8px; }
 
 .gr-group-title { font-weight: 600; margin-bottom: 6px; font-size: 1.6em; line-height: 1.25; }
 .gr-group-summary { color: var(--vscode-descriptionForeground); line-height: 1.55; font-size: 1.12em; }
@@ -287,11 +300,24 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 /* narrow panels have no room for two columns: the chapter guide sits above its
    diffs and the file list goes away, since every file is already on screen below */
 @media (max-width: 900px) {
-  .gr-chapter { grid-template-columns: minmax(0, 1fr); gap: 0; }
-  .gr-chapter-summary { height: auto; }
-  .gr-chapter-sticky { position: static; padding: 22px 0 12px; }
+  /* one column, so the summary is a block in the flow and sticks against the
+     whole chapter's travel rather than against its own grid row */
+  .gr-chapter { display: block; }
+  .gr-chapter-summary {
+    height: auto;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding: 22px 0 12px;
+    background: var(--vscode-editor-background);
+    /* the same fade the toolbar uses, so diffs pass under it rather than meeting a line */
+    box-shadow: 0 8px 12px -4px var(--vscode-editor-background);
+  }
+  .gr-chapter-sticky { position: static; padding: 0; }
   .gr-chapter-summary .gr-filelist { display: none; }
-  .gr-pill { width: auto; right: 18px; }
+  /* the diff view's chapter has no title, and the file list is gone here, so the
+     summary would stick to the top of the scroller as an empty band */
+  .gr-chapter:not(:has(.gr-group-title)) .gr-chapter-summary { display: none; }
 }
 
 /* ── file list ─────────────────────────────────────────────────────────── */
@@ -335,8 +361,12 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .gr-pill {
   position: fixed;
   bottom: 18px;
-  left: 18px;
-  width: var(--gr-summary-width);
+  left: var(--gr-gutter);
+  /* as wide as it needs to be — a wordy state or a four-digit diffstat has to fit inside
+     the pill, not run out of it — but never narrower than the column it sits under */
+  width: max-content;
+  min-width: var(--gr-summary-width);
+  max-width: calc(100% - 2 * var(--gr-gutter));
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -349,10 +379,45 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   font-size: 0.9em;
 }
 
-.gr-pill-label { color: var(--vscode-descriptionForeground); }
-.gr-pill-label.error { color: var(--vscode-errorForeground); }
+.gr-pill-label { color: var(--vscode-descriptionForeground); white-space: nowrap; }
+/* an error is a sentence, not a status: it wraps rather than running out of the pill */
+.gr-pill-label.error { color: var(--vscode-errorForeground); white-space: normal; }
 .gr-pill-stat { display: inline-flex; gap: 7px; color: var(--vscode-descriptionForeground); white-space: nowrap; }
 .gr-pill button { margin-left: auto; white-space: nowrap; }
+
+/* one column has no left rail to hang off: the pill sits centred on the bottom and
+   only as wide as its own contents, so the label never wraps */
+@media (max-width: 900px) {
+  .gr-pill {
+    min-width: 0;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+}
+
+/* the guide's spinner: a still track with one arc of the checkbox's blue turning on it */
+.gr-spinner { flex: 0 0 auto; }
+.gr-spinner-track,
+.gr-spinner-arc { fill: none; stroke-width: 2; }
+/* the checkbox's own ring, lifted towards the label's grey: at its native weight it
+   disappears into the pill and the arc reads as one stray mark */
+.gr-spinner-track {
+  stroke: color-mix(in srgb, var(--vscode-checkbox-border, var(--gr-faint)) 45%, var(--vscode-descriptionForeground));
+}
+.gr-spinner-arc {
+  stroke: var(--vscode-button-background);
+  stroke-linecap: round;
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: gr-spin 0.7s linear infinite;
+}
+
+@keyframes gr-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .gr-spinner-arc { animation-duration: 2s; }
+}
 
 
 
@@ -393,6 +458,11 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 }
 
 .gr-file-toggle[aria-expanded='false'] .gr-caret { transform: rotate(-90deg); }
+
+/* the caret brightens on hover: without this it takes the primary button's blue plate,
+   and a plate behind a 9px glyph is a sliver either way */
+.gr-file-toggle:hover { background: none; }
+.gr-file-toggle:hover .gr-caret { color: var(--vscode-foreground); }
 
 .gr-reviewed {
   display: inline-flex;

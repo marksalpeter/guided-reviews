@@ -14,6 +14,7 @@ export const GuideStatus = ({
   if (busy) {
     return (
       <Pill>
+        <Spinner />
         <span className="gr-pill-label">Generating guide…</span>
         <DiffStat files={files} />
       </Pill>
@@ -49,6 +50,15 @@ export const GuideStatus = ({
   }
   return null
 }
+
+/** Spinner is the ring the guide turns while it writes: one still track, one arc over it.
+    Both are strokes on the same radius, so the arc can never sit off the track. */
+const Spinner = () => (
+  <svg className="gr-spinner" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+    <circle className="gr-spinner-track" cx="8" cy="8" r="6.5" />
+    <path className="gr-spinner-arc" d="M8 1.5 A 6.5 6.5 0 0 1 14.5 8" />
+  </svg>
+)
 
 /** Pill is the floating container anchored to the bottom of the left column. */
 const Pill = ({ children }: { children: React.ReactNode }) => <div className="gr-pill">{children}</div>

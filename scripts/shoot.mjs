@@ -25,6 +25,7 @@ const themes = {
     'charts-orange': '#d18616', 'charts-purple': '#b180d7',
     'list-hoverBackground': '#2a2d2e', 'list-activeSelectionBackground': '#04395e',
     'list-activeSelectionForeground': '#ffffff', 'toolbar-hoverBackground': '#5a5d5e50',
+    'checkbox-border': '#3c3c3c',
   },
   light: {
     'editor-background': '#ffffff', 'editor-foreground': '#3b3b3b', 'foreground': '#3b3b3b',
@@ -44,6 +45,7 @@ const themes = {
     'charts-orange': '#d18616', 'charts-purple': '#652d90',
     'list-hoverBackground': '#e8e8e8', 'list-activeSelectionBackground': '#0060c0',
     'list-activeSelectionForeground': '#ffffff', 'toolbar-hoverBackground': '#b8b8b850',
+    'checkbox-border': '#cecece',
   },
 }
 

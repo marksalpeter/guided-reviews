@@ -2,7 +2,6 @@ import { Fragment, useEffect, useRef, useState, type ReactNode, type RefObject }
 
 import type { SelectorState } from '../core/protocol.js'
 import type { BranchSummary, Timeline, TimelineCommit } from '../core/types.js'
-import { Caret } from './Caret.js'
 import { post } from './vscodeApi.js'
 
 /** BranchBar is the toolbar's picker row: the branch compared against, then the two commits bracketing the diff. */
@@ -25,7 +24,7 @@ export const BranchBar = ({ selector }: { selector: SelectorState }) => {
         onSelect={sha => post({ type: 'selectBase', sha })}
       />
       <span className="gr-sep" aria-hidden="true">
-        →
+        <Chevron />
       </span>
       <CommitPicker
         role="target"
@@ -183,6 +182,20 @@ const ForkMarker = ({ forkedFrom }: { forkedFrom: string }) => (
 /** Pill is the hairline chip that names what makes a row special. */
 const Pill = ({ label }: { label: string }) => <span className="gr-tag">{label}</span>
 
+/** Chevron is the '>' the range reads across: from the base commit to the target. */
+const Chevron = () => (
+  <svg viewBox="0 0 6 10" width="5" height="9" aria-hidden="true">
+    <path
+      d="M1 1 L5 5 L1 9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
 /** ForkGlyph is the extension's own trunk-and-limb mark, drawn in the current text colour. */
 const ForkGlyph = () => (
   <svg className="gr-glyph" viewBox="0 0 128 128" width="13" height="13" aria-hidden="true">
@@ -227,7 +240,6 @@ const Dropdown = ({
         onClick={() => setOpen(previous => !previous)}
       >
         {trigger}
-        <Caret />
       </button>
       {open && (
         <div className="gr-popup" role="listbox">
