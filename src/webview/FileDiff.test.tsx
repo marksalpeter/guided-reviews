@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { parseDiff, type FileData } from 'react-diff-view'
-import type { ChangedFile } from '../core/types.js'
+import type { AnchorSide, ChangedFile, Thread } from '../core/types.js'
 import { FileDiff } from './FileDiff.js'
 import { post } from './vscodeApi.js'
 
@@ -36,12 +36,12 @@ const meta: ChangedFile = {
 const file = parseDiff(patch)[0] as FileData
 
 /** show renders the diff with the base text already in hand. */
-function show(withSource = true) {
+function show(withSource = true, threads: Thread[] = []) {
   return render(
     <FileDiff
       file={file}
       meta={meta}
-      threads={[]}
+      threads={threads}
       refractor={null}
       source={withSource ? source : undefined}
       reviewed={false}
@@ -51,6 +51,19 @@ function show(withSource = true) {
       onToggleReviewed={() => {}}
     />,
   )
+}
+
+/** lineThread pins a one-comment thread to a line on the given side. */
+function lineThread(side: AnchorSide, line: number, body: string): Thread {
+  return {
+    id: `t-${side}-${line}`,
+    anchor: { kind: 'line', path: 'a.txt', side, line, blob: side === 'new' ? 'head' : 'base', text: '', contextHash: '' },
+    state: 'open',
+    comments: [{ id: 'c1', author: 'human', body, at: '2026-01-01T00:00:00Z' }],
+    createdAt: '2026-01-01T00:00:00Z',
+    status: 'current',
+    resolvedLine: line,
+  }
 }
 
 describe('FileDiff', () => {
@@ -104,5 +117,17 @@ describe('FileDiff', () => {
 
     expect(screen.getAllByLabelText('Expand up')).toHaveLength(1)
     expect(screen.getAllByLabelText('Expand down')).toHaveLength(1)
+  })
+
+  it('attaches a new-side comment only to the added line, not the deleted line of the same number', () => {
+    show(true, [lineThread('new', 12, 'note on the addition')])
+
+    expect(screen.getAllByText('note on the addition')).toHaveLength(1)
+  })
+
+  it('attaches an old-side comment only to the deleted line, not the added line of the same number', () => {
+    show(true, [lineThread('old', 12, 'note on the deletion')])
+
+    expect(screen.getAllByText('note on the deletion')).toHaveLength(1)
   })
 })

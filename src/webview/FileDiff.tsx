@@ -248,8 +248,7 @@ function useWidgets(
     for (const hunk of hunks) {
       for (const change of hunk.changes) {
         const key = getChangeKey(change)
-        const line = lineOf(change)
-        const onLine = threads.filter(thread => threadLine(thread) === line && thread.status !== 'outdated')
+        const onLine = threads.filter(thread => thread.status !== 'outdated' && anchoredAt(thread, change))
         const isPending = pending?.key === key
         if (onLine.length === 0 && !isPending) {
           continue
@@ -306,10 +305,14 @@ function pendingFor(change: ChangeData): PendingComment {
   }
 }
 
-/** lineOf is the line number a change occupies on whichever side it exists. */
-function lineOf(change: ChangeData): number {
-  const newLine = computeNewLineNumber(change)
-  return newLine > 0 ? newLine : computeOldLineNumber(change)
+/** anchoredAt reports whether a line thread points at this change on its own side of the diff. */
+function anchoredAt(thread: Thread, change: ChangeData): boolean {
+  if (thread.anchor.kind !== 'line') {
+    return false
+  }
+  const line = threadLine(thread)
+  const onSide = thread.anchor.side === 'old' ? computeOldLineNumber(change) : computeNewLineNumber(change)
+  return onSide > 0 && onSide === line
 }
 
 /** threadLine is the line a thread currently points at, after relocation. */
