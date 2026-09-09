@@ -307,7 +307,9 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
     height: auto;
     position: sticky;
     top: 0;
-    z-index: 3;
+    /* above the fold handles that pin beneath it, so its fade covers them rather than
+       the other way round */
+    z-index: 4;
     padding: 22px 0 12px;
     background: var(--vscode-editor-background);
     /* the same fade the toolbar uses, so diffs pass under it rather than meeting a line */
@@ -581,6 +583,13 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   white-space: nowrap;
   font-family: var(--vscode-font-family);
   font-size: 11px;
+}
+
+/* one column puts the chapter summary in a sticky band across the whole pane, so the handle
+   pins under that instead of at the top of the scroller. The band's height is measured onto
+   the chapter, since CSS cannot read it. Kept here, after the rule it overrides. */
+@media (max-width: 900px) {
+  .gr-fold-handle { top: var(--gr-chapter-band, 0px); }
 }
 
 /* the borrowed lines keep the bars' ground rather than the patch's, so the block reads as

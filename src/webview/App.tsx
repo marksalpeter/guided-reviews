@@ -42,6 +42,7 @@ export const App = () => {
   const chapters = useChapters(files, payload?.review.state.guide, mode)
   const scroller = useRef<HTMLDivElement>(null)
   useScrollAnchor(scroller, chapters)
+  useChapterBand(scroller, chapters)
   useFocusedThread(payload, setCollapsed, setForced)
 
   const jumpToFile = useCallback((path: string) => {
@@ -333,6 +334,30 @@ function useChapters(files: FileData[], guide: Guide | undefined, mode: Mode): C
     return chapters
     // the guide arrives as a fresh object each push; its head and chapter ids are what change
   }, [files, signature, mode])
+}
+
+/** useChapterBand publishes each chapter summary's height, for the sticky offsets below it. */
+function useChapterBand(scroller: React.RefObject<HTMLDivElement | null>, chapters: Chapter[]): void {
+  const signature = chapters.map(chapter => chapter.id).join('|')
+
+  useLayoutEffect(() => {
+    const summaries = scroller.current?.querySelectorAll<HTMLElement>('.gr-chapter-summary') ?? []
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        publishBand(entry.target as HTMLElement)
+      }
+    })
+    for (const summary of summaries) {
+      publishBand(summary)
+      observer.observe(summary)
+    }
+    return () => observer.disconnect()
+  }, [scroller, signature])
+}
+
+/** publishBand records a summary's height on its chapter; only the one-column layout reads it. */
+function publishBand(summary: HTMLElement): void {
+  summary.parentElement?.style.setProperty('--gr-chapter-band', `${summary.offsetHeight}px`)
 }
 
 /** useScrollAnchor keeps the file under the reader pinned when the guide reorders the pane. */
