@@ -15,18 +15,19 @@ await new Promise(r=>server.listen(4325,r))
 const browser=await chromium.launch({args:['--no-sandbox']})
 const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:2})
 await page.goto('http://localhost:4325/h',{waitUntil:'networkidle'})
-await page.waitForSelector('.gr-expander')
-// one step already taken, so the row carries both halves of the control: what is left, and the way back
-await page.getByLabel('Expand down').first().click()
+await page.waitForSelector('.gr-fold')
+// a peek, so the fold carries both of its bars: the handle that shuts it and the mark that
+// still counts what it is holding back
+await page.locator('.gr-fold-peek').first().click()
 await page.waitForTimeout(300)
-const row = page.locator('.gr-expander').first()
-await row.scrollIntoViewIfNeeded()
+const fold = page.locator('.gr-fold').first()
+await fold.scrollIntoViewIfNeeded()
 await page.waitForTimeout(400)
-const box = await row.boundingBox()
-const file = await page.locator('.gr-file').filter({ has: page.locator('.gr-expander') }).first().boundingBox()
+const box = await fold.boundingBox()
+const file = await page.locator('.gr-file').filter({ has: page.locator('.gr-fold') }).first().boundingBox()
 await page.screenshot({
   path: 'media/screenshot-expand.png',
-  clip: { x: file.x, y: box.y - 96, width: file.width, height: box.height + 108 },
+  clip: { x: file.x, y: box.y - 60, width: file.width, height: box.height + 72 },
 })
 await browser.close(); server.close()
 console.log('wrote media/screenshot-expand.png')

@@ -14,11 +14,11 @@ const patch = [
   'diff --git a/a.txt b/a.txt',
   '--- a/a.txt',
   '+++ b/a.txt',
-  '@@ -11,3 +11,3 @@',
-  ' line11',
-  '-line12',
-  '+LINE12',
-  ' line13',
+  '@@ -31,3 +31,3 @@',
+  ' line31',
+  '-line32',
+  '+LINE32',
+  ' line33',
   '',
 ].join('\n')
 
@@ -81,8 +81,8 @@ describe('FileDiff', () => {
   it('counts the unchanged lines on each side of the hunk', () => {
     show()
 
-    expect(screen.getByText('10 lines unchanged')).toBeTruthy()
-    expect(screen.getByText('47 lines unchanged')).toBeTruthy()
+    expect(screen.getByText('30 lines unchanged')).toBeTruthy()
+    expect(screen.getByText('27 lines unchanged')).toBeTruthy()
   })
 
   it('shows no expanders until the base text arrives', () => {
@@ -91,42 +91,56 @@ describe('FileDiff', () => {
     expect(screen.queryByText(/unchanged/)).toBeNull()
   })
 
-  it('reveals the run above the hunk, and takes it back on collapse', () => {
+  it('opens a whole run when its bar is clicked, and takes it back on collapse', () => {
     show()
 
-    fireEvent.click(screen.getByText('10 lines unchanged'))
+    fireEvent.click(screen.getByText('30 lines unchanged'))
     expect(screen.getByText('line1')).toBeTruthy()
 
-    fireEvent.click(screen.getByText('Collapse 10 lines'))
+    fireEvent.click(screen.getByText('Collapse 30 lines'))
     expect(screen.queryByText('line1')).toBeNull()
   })
 
-  it('reveals one step of a longer run from the edge whose arrow was clicked', () => {
+  it('peeks one step of a run, leaving the rest of it marked', () => {
     show()
 
-    fireEvent.click(screen.getAllByLabelText('Expand down')[0] as HTMLElement)
+    fireEvent.click(screen.getAllByText('Show 20')[1] as HTMLElement)
 
-    expect(screen.getByText('line33')).toBeTruthy()
-    expect(screen.queryByText('line34')).toBeNull()
+    expect(screen.getByText('line34')).toBeTruthy()
+    expect(screen.getByText('line53')).toBeTruthy()
+    expect(screen.queryByText('line54')).toBeNull()
     expect(screen.getByText('Collapse 20 lines')).toBeTruthy()
-    expect(screen.getByText('27 lines unchanged')).toBeTruthy()
+    expect(screen.getByText('7 lines unchanged')).toBeTruthy()
   })
 
-  it('offers only the arrow that has a hunk beside it at the ends of the file', () => {
+  it('reads mark, then handle, then lines for the run at the top of a file', () => {
     show()
 
-    expect(screen.getAllByLabelText('Expand up')).toHaveLength(1)
-    expect(screen.getAllByLabelText('Expand down')).toHaveLength(1)
+    fireEvent.click(screen.getAllByText('Show 20')[0] as HTMLElement)
+    const read = document.body.textContent ?? ''
+
+    expect(read.indexOf('10 lines unchanged')).toBeLessThan(read.indexOf('Collapse 20 lines'))
+    expect(read.indexOf('Collapse 20 lines')).toBeLessThan(read.indexOf('line11'))
+  })
+
+  it('reads handle, then lines, then mark for a run below the top of a file', () => {
+    show()
+
+    fireEvent.click(screen.getAllByText('Show 20')[1] as HTMLElement)
+    const read = document.body.textContent ?? ''
+
+    expect(read.indexOf('Collapse 20 lines')).toBeLessThan(read.indexOf('line34'))
+    expect(read.indexOf('line34')).toBeLessThan(read.indexOf('7 lines unchanged'))
   })
 
   it('attaches a new-side comment only to the added line, not the deleted line of the same number', () => {
-    show(true, [lineThread('new', 12, 'note on the addition')])
+    show(true, [lineThread('new', 32, 'note on the addition')])
 
     expect(screen.getAllByText('note on the addition')).toHaveLength(1)
   })
 
   it('attaches an old-side comment only to the deleted line, not the added line of the same number', () => {
-    show(true, [lineThread('old', 12, 'note on the deletion')])
+    show(true, [lineThread('old', 32, 'note on the deletion')])
 
     expect(screen.getAllByText('note on the deletion')).toHaveLength(1)
   })

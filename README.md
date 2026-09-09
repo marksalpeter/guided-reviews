@@ -19,14 +19,16 @@ You can start a guided review in three ways:
 
 ## How to read the diff
 
-**Open the lines the diff left out.** Every run of unchanged code between hunks carries a
-row saying how many lines it hides. Its arrow reveals twenty at a time from the edge it
-points at, and the count itself opens the whole run at once.
+**Open the lines the diff left out.** Every run of unchanged code carries a bar counting what
+it hides. Click anywhere on it and the whole run opens, so the number you collapse is the
+number you were offered. `Show 20` takes a step instead, for a run too long to want in one go.
 
-**Shut it again.** The same row offers the way back, so a file returns to the change it is
-actually about. A run holding a comment thread stays open far enough to show it.
+**Shut it again.** The bar becomes the run's handle and holds the top of the pane while the
+lines it opened are on screen, so the way back is one click away however far in you have
+scrolled. Whatever is still hidden keeps its own mark, at the edge those lines actually sit
+behind. A run holding a comment thread stays open far enough to show it.
 
-![A run of unchanged lines opened between two hunks, the row below it offering the four lines still hidden and the way back](media/screenshot-expand.png)
+![A run opened between two hunks: the handle above the borrowed lines, and the mark counting the four it still holds back](media/screenshot-expand.png)
 
 ## How to send feedback to agents
 
@@ -79,9 +81,9 @@ function that both the panel and the CLI use — so they cannot disagree. Append
 is taken only for larger records.
 
 **The diff renders through `react-diff-view`** in unified mode, with comment threads
-anchored via its `widgets` API. Opening the lines around a hunk asks the host for the base
-blob and rebuilds that hunk from it — the reveals are held per run rather than baked into
-the hunks, so collapsing puts the file back exactly as the patch had it. Syntax
+anchored via its `widgets` API. Each hunk renders as its own table, and an opened run as one
+more between them, holding lines the host reads out of the base blob — a run is a number of
+lines rather than an edit to the patch, so collapsing puts the file back exactly as it was. Syntax
 highlighting is Shiki running the same TextMate grammars VS Code itself uses, bridged into
 the library's refractor-shaped hook. Every colour and font comes from `--vscode-*` theme
 variables, so the panel looks native in any theme.

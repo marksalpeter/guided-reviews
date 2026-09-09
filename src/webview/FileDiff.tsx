@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  Decoration,
   Diff,
-  Hunk,
   computeNewLineNumber,
   computeOldLineNumber,
   getChangeKey,
@@ -18,18 +16,7 @@ import {
 import type { ChangedFile, Thread } from '../core/types.js'
 import { Caret } from './Caret.js'
 import { CommentThread, NewCommentBox } from './CommentThread.js'
-import {
-  gapsOf,
-  hiddenIn,
-  opened,
-  openedAll,
-  segmentsOf,
-  shownIn,
-  shut,
-  type Expansion,
-  type Expansions,
-  type Gap,
-} from './expand.js'
+import { borrowedHunk, expandStep, gapsOf, hiddenIn, sizeOf, type Expansions, type Gap, type Pin } from './expand.js'
 import { languageForPath, plaintext, type RefractorLike } from './highlight.js'
 import { classNameOf, markClassName, styleOf } from './tokens.js'
 import { post } from './vscodeApi.js'
@@ -65,10 +52,28 @@ export const FileDiff = ({
   useEffect(() => setExpansions({}), [file])
 
   const gaps = useGaps(file, source, expansions, threads)
-  const segments = useSegments(file, source, gaps)
-  const hunks = useMemo(() => segments.flat(), [segments])
+  const borrowed = useBorrowed(gaps, source)
+  const hunks = useMemo(() => [...file.hunks, ...borrowed.values()], [file, borrowed])
   const tokens = useTokens(file, hunks, refractor)
   const widgets = useWidgets(file, hunks, threads, pending, setPending)
+
+  const table = (hunk: HunkData) => (
+    <DiffTable file={file} hunk={hunk} tokens={tokens} widgets={widgets} onPick={setPending} />
+  )
+  const foldAt = (index: number) => {
+    const gap = gaps.find(candidate => candidate.index === index)
+    if (!gap) {
+      return null
+    }
+    const lines = borrowed.get(gap.index)
+    return (
+      <Fold
+        gap={gap}
+        lines={lines ? table(lines) : null}
+        onChange={shown => setExpansions(previous => ({ ...previous, [gap.index]: shown }))}
+      />
+    )
+  }
 
   return (
     <section className={`gr-file${reviewed ? ' reviewed' : ''}`} id={fileAnchorId(pathOf(file))}>
@@ -96,93 +101,116 @@ export const FileDiff = ({
         (meta?.binary ? (
           <BinaryNote />
         ) : (
-          <Diff
-            viewType="unified"
-            diffType={file.type as DiffType}
-            hunks={hunks}
-            tokens={tokens}
-            widgets={widgets}
-            renderToken={renderToken}
-            gutterEvents={{
-              onClick: ({ change }) => {
-                if (change) {
-                  setPending(pendingFor(change))
-                }
-              },
-            }}
-          >
-            {() =>
-              rows(segments, gaps, (index, expansion) =>
-                setExpansions(previous => ({ ...previous, [index]: expansion })),
-              )
-            }
-          </Diff>
+          <div className="gr-diff">
+            {file.hunks.map((hunk, index) => (
+              <Fragment key={hunk.content}>
+                {foldAt(index)}
+                {table(hunk)}
+              </Fragment>
+            ))}
+            {foldAt(file.hunks.length)}
+          </div>
         ))}
     </section>
   )
 }
 
-/** rows lays the file out as it reads: each gap's control row, then the hunk that follows it. */
-function rows(
-  segments: readonly HunkData[][],
-  gaps: readonly Gap[],
-  onChange: (index: number, expansion: Expansion) => void,
-): ReactElement[] {
-  const laid: ReactElement[] = []
+/** Fold is one run of unchanged lines: the bars that open and shut it, and the lines between them. */
+const Fold = ({ gap, lines, onChange }: { gap: Gap; lines: ReactNode; onChange: (shown: number) => void }) => {
+  const rest = hiddenIn(gap)
+  const mark = rest > 0 && (
+    <Bar
+      role="gr-fold-mark"
+      label={`${countOf(rest)} unchanged`}
+      onClick={() => onChange(sizeOf(gap))}
+      onPeek={rest > expandStep ? () => onChange(gap.shown + expandStep) : undefined}
+    />
+  )
+  const handle = gap.shown > 0 && (
+    <Bar role="gr-fold-handle" label={`Collapse ${countOf(gap.shown)}`} onClick={() => onChange(0)} />
+  )
 
-  for (let index = 0; index <= segments.length; index++) {
-    const gap = gaps.find(candidate => candidate.index === index)
-    if (gap) {
-      laid.push(<GapRow key={`gap-${index}`} gap={gap} onChange={expansion => onChange(index, expansion)} />)
-    }
-    for (const hunk of segments[index] ?? []) {
-      laid.push(<Hunk key={hunk.content} hunk={hunk} />)
-    }
-  }
-
-  return laid
-}
-
-/** GapRow stands in for a run of unchanged lines, carrying the controls that open and shut it. */
-const GapRow = ({ gap, onChange }: { gap: Gap; onChange: (expansion: Expansion) => void }) => {
-  const hiddenLines = hiddenIn(gap)
-  const shownLines = shownIn(gap)
-
+  // the handle stays against the borrowed lines and the mark sits past it, at the run's outer
+  // edge, so a run at the top of a file — which grows upward — reads in the opposite order
   return (
-    <Decoration className="gr-expander">
-      <div className="gr-expander-arrows">
-        {hiddenLines > 0 &&
-          gap.edges.map(edge => (
-            <button
-              key={edge}
-              className={`gr-expander-arrow${edge === 'bottom' ? ' up' : ''}`}
-              aria-label={edge === 'top' ? 'Expand down' : 'Expand up'}
-              onClick={() => onChange(opened(gap, edge))}
-            >
-              <Caret />
-            </button>
-          ))}
-      </div>
-      <div className="gr-expander-content">
-        {hiddenLines > 0 && (
-          <button className="gr-expander-label" onClick={() => onChange(openedAll(gap))}>
-            {countOf(hiddenLines)} unchanged
-          </button>
-        )}
-        {shownLines > 0 && (
-          <button className="gr-expander-label" onClick={() => onChange(shut)}>
-            Collapse {countOf(shownLines)}
-          </button>
-        )}
-      </div>
-    </Decoration>
+    <section className="gr-fold" data-grows={gap.grows}>
+      {gap.grows === 'up' ? (
+        <>
+          {mark}
+          {handle}
+          {lines}
+        </>
+      ) : (
+        <>
+          {handle}
+          {lines}
+          {mark}
+        </>
+      )}
+    </section>
   )
 }
 
-/** countOf renders a line count the way the row reads it out. */
-function countOf(lines: number): string {
-  return `${lines} line${lines === 1 ? '' : 's'}`
-}
+/** Bar is one edge of a fold: an action across its whole width, and the peek that takes a step. */
+const Bar = ({
+  role,
+  label,
+  onClick,
+  onPeek,
+}: {
+  role: string
+  label: string
+  onClick: () => void
+  onPeek?: () => void
+}) => (
+  <div className={role}>
+    <button className="gr-fold-act" onClick={onClick}>
+      <span className="gr-fold-caret">
+        <Caret />
+      </span>
+      <span className="gr-fold-label">{label}</span>
+    </button>
+    {onPeek && (
+      <button className="gr-fold-peek" onClick={onPeek}>
+        Show {expandStep}
+      </button>
+    )}
+  </div>
+)
+
+/** DiffTable renders one hunk under the file's shared tokens, widgets, and gutter behaviour. */
+const DiffTable = ({
+  file,
+  hunk,
+  tokens,
+  widgets,
+  onPick,
+}: {
+  file: FileData
+  hunk: HunkData
+  tokens: HunkTokens | undefined
+  widgets: Record<string, ReactNode>
+  onPick: (pending: PendingComment) => void
+}) => (
+  <Diff
+    viewType="unified"
+    diffType={file.type as DiffType}
+    hunks={[hunk]}
+    tokens={tokens}
+    widgets={widgets}
+    renderToken={renderToken}
+    gutterEvents={{
+      onClick: ({ change }) => {
+        if (change) {
+          onPick(pendingFor(change))
+        }
+      },
+    }}
+  />
+)
+
+/** BinaryNote stands in for a diff that cannot be rendered or commented on. */
+const BinaryNote = () => <div className="gr-file-note">Binary file — not shown.</div>
 
 /** useBaseText asks the host for the file's base text the first time the diff is on screen. */
 function useBaseText(blob: string | undefined, hidden: boolean, source: string[] | undefined): void {
@@ -195,22 +223,28 @@ function useBaseText(blob: string | undefined, hidden: boolean, source: string[]
 
 /** useGaps finds the runs the diff left out, which only the base text can measure. */
 function useGaps(file: FileData, source: string[] | undefined, expansions: Expansions, threads: Thread[]): Gap[] {
-  const pinned = threads.filter(thread => thread.status !== 'outdated').map(threadLine)
-  const signature = pinned.join(',')
+  const pinned = threads.filter(thread => thread.status !== 'outdated').flatMap(pinsOf)
+  const signature = pinned.map(pin => `${pin.side}${pin.line}`).join(',')
 
   return useMemo(
     // the threads arrive as fresh objects each push, so the memo keys on the lines they hold
-    () => (source ? gapsOf(file.hunks, source.length, expansions, pinned.filter(isLine)) : []),
+    () => (source ? gapsOf(file.hunks, source.length, expansions, pinned) : []),
     [file, source, expansions, signature],
   )
 }
 
-/** useSegments rebuilds each hunk with the lines its neighbouring gaps have opened. */
-function useSegments(file: FileData, source: string[] | undefined, gaps: Gap[]): HunkData[][] {
-  return useMemo(
-    () => (source ? segmentsOf(file.hunks, source, gaps) : file.hunks.map(hunk => [hunk])),
-    [file, source, gaps],
-  )
+/** useBorrowed builds the hunk of opened lines each run is currently showing. */
+function useBorrowed(gaps: Gap[], source: string[] | undefined): Map<number, HunkData> {
+  return useMemo(() => {
+    const opened = new Map<number, HunkData>()
+    for (const gap of source ? gaps : []) {
+      const hunk = borrowedHunk(gap, source ?? [])
+      if (hunk) {
+        opened.set(gap.index, hunk)
+      }
+    }
+    return opened
+  }, [gaps, source])
 }
 
 /** useTokens highlights the file through Shiki, falling back to plain text on any failure. */
@@ -295,6 +329,11 @@ const renderToken: RenderToken = (token, renderDefault, index) => {
   )
 }
 
+/** countOf renders a line count the way a fold's bars read it out. */
+function countOf(lines: number): string {
+  return `${lines} line${lines === 1 ? '' : 's'}`
+}
+
 /** pendingFor turns a clicked change into the composer target for that line. */
 function pendingFor(change: ChangeData): PendingComment {
   const newLine = computeNewLineNumber(change)
@@ -320,9 +359,10 @@ function threadLine(thread: Thread): number | undefined {
   return thread.anchor.kind === 'line' ? (thread.resolvedLine ?? thread.anchor.line) : undefined
 }
 
-/** isLine narrows away the threads that hang off a chapter rather than a line. */
-function isLine(line: number | undefined): line is number {
-  return line !== undefined
+/** pinsOf is the line a thread holds open inside a run, on the side it is anchored to. */
+function pinsOf(thread: Thread): Pin[] {
+  const line = threadLine(thread)
+  return thread.anchor.kind === 'line' && line !== undefined ? [{ side: thread.anchor.side, line }] : []
 }
 
 /** pathOf is the file's current path, falling back to its pre-rename path. */
@@ -339,9 +379,6 @@ function displayPath(file: FileData): string {
 export function fileAnchorId(path: string): string {
   return `file-${path.replace(/[^a-zA-Z0-9]/g, '-')}`
 }
-
-/** BinaryNote stands in for a diff that cannot be rendered or commented on. */
-const BinaryNote = () => <div className="gr-file-note">Binary file — not shown.</div>
 
 /** PendingComment is the line the reviewer is currently composing against. */
 interface PendingComment {
