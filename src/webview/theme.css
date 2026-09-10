@@ -606,7 +606,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
   border: 1px solid var(--vscode-panel-border);
   border-radius: var(--gr-card-radius);
-  padding: 10px 40px 10px 12px;
+  padding: 10px 8px 10px 12px;
   margin-bottom: 8px;
   max-width: 760px;
 }
@@ -623,8 +623,8 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   background: transparent;
   border: none;
@@ -634,6 +634,25 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   color: var(--vscode-descriptionForeground);
 }
 
+.gr-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--gr-radius);
+  cursor: pointer;
+  opacity: 0.6;
+  color: var(--vscode-descriptionForeground);
+}
+
+.gr-close:hover,
 .gr-tick:hover {
   opacity: 1;
   background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground, transparent));
@@ -655,8 +674,19 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   white-space: nowrap;
 }
 
-.gr-comment { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px; line-height: 1.5; }
+.gr-comment { display: flex; align-items: flex-start; gap: 9px; padding: 21px 0; line-height: 1.5; }
+.gr-comments .gr-comment:first-child { padding-top: 0; }
+.gr-comment + .gr-comment { border-top: 1px solid var(--vscode-panel-border); }
 .gr-comment-body { flex: 1; min-width: 0; white-space: pre-wrap; }
+.gr-comment-mark { flex: none; width: 6px; align-self: stretch; padding-top: 6px; }
+
+.gr-comment-dot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vscode-textLink-foreground);
+}
 
 .gr-comment-delete {
   flex: none;
@@ -681,11 +711,44 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   opacity: 1;
   background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground, transparent));
 }
-.gr-author { font-weight: 600; margin-right: 6px; color: var(--vscode-textLink-foreground); }
+.gr-composer {
+  margin: 0 -8px -10px -12px;
+  padding: 9px 8px 10px 27px;
+  border-top: 1px solid var(--vscode-panel-border);
+  cursor: text;
+}
 
-.gr-composer { display: flex; gap: 8px; align-items: flex-end; margin-top: 8px; }
-.gr-composer textarea { flex: 1; min-height: 28px; }
-.gr-composer button:disabled { opacity: 0.45; cursor: default; }
+.gr-thread.fresh .gr-composer { margin-top: -10px; padding: 10px; border-top: none; }
+.gr-thread.fresh .gr-composer textarea { padding-right: 24px; }
+
+.gr-composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  line-height: 1.5;
+  resize: none;
+  overflow: hidden;
+}
+
+.gr-composer textarea:focus { outline: none; }
+.gr-composer-buttons { display: flex; justify-content: flex-end; margin-top: 6px; }
+
+.gr-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 18px 6px 7px;
+  border-radius: 999px;
+}
+
+.gr-send:disabled { opacity: 0.45; cursor: default; }
 
 .gr-badge {
   display: inline-block;

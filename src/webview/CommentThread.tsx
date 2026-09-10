@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Comment, Thread } from '../core/types.js'
 import { post } from './vscodeApi.js'
 
@@ -27,15 +27,18 @@ export const CommentThread = ({ thread }: { thread: Thread }) => {
       ) : (
         <>
           {thread.status === 'outdated' && <OutdatedNotice thread={thread} />}
-          {thread.comments.map(comment => (
-            <CommentBody
-              key={comment.id}
-              comment={comment}
-              onDelete={() => post({ type: 'deleteComment', threadId: thread.id, commentId: comment.id })}
-            />
-          ))}
+          <div className="gr-comments">
+            {thread.comments.map(comment => (
+              <CommentBody
+                key={comment.id}
+                comment={comment}
+                onDelete={() => post({ type: 'deleteComment', threadId: thread.id, commentId: comment.id })}
+              />
+            ))}
+          </div>
           <Composer
-            placeholder={resolved ? 'Reply to reopen…' : 'Reply…'}
+            placeholder="Reply…"
+            submitLabel="Reply"
             onSubmit={body => post({ type: 'reply', threadId: thread.id, body })}
           />
         </>
@@ -60,13 +63,13 @@ const ResolveTick = ({ resolved, onToggle }: { resolved: boolean; onToggle: () =
   </button>
 )
 
-/** CommentBody renders one message, labelling only the agent, with a delete affordance on hover. */
+/** CommentBody renders one message, marking only the agent, with a delete affordance on hover. */
 const CommentBody = ({ comment, onDelete }: { comment: Comment; onDelete: () => void }) => (
   <div className="gr-comment">
-    <div className="gr-comment-body">
-      {comment.author === 'agent' && <span className="gr-author">agent</span>}
-      {comment.body}
-    </div>
+    <span className="gr-comment-mark">
+      {comment.author === 'agent' && <i className="gr-comment-dot" title="agent" />}
+    </span>
+    <div className="gr-comment-body">{comment.body}</div>
     <button className="gr-comment-delete" aria-label="Delete comment" title="Delete comment" onClick={onDelete}>
       <TrashIcon />
     </button>
@@ -75,7 +78,7 @@ const CommentBody = ({ comment, onDelete }: { comment: Comment; onDelete: () => 
 
 /** TrashIcon is the delete glyph shown when a comment is hovered. */
 const TrashIcon = () => (
-  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+  <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
     <path
       fill="none"
       stroke="currentColor"
@@ -94,9 +97,22 @@ const OutdatedNotice = ({ thread }: { thread: Thread }) => (
   </>
 )
 
-/** Composer is the always-present box for adding a message to a thread. */
-const Composer = ({ placeholder, onSubmit }: { placeholder: string; onSubmit: (body: string) => void }) => {
+/** Composer is the box for adding a message: the whole region types, the button sends. */
+const Composer = ({
+  placeholder,
+  submitLabel,
+  autoFocus = false,
+  onSubmit,
+  onCancel,
+}: {
+  placeholder: string
+  submitLabel: string
+  autoFocus?: boolean
+  onSubmit: (body: string) => void
+  onCancel?: () => void
+}) => {
   const [draft, setDraft] = useState('')
+  const field = useRef<HTMLTextAreaElement>(null)
   const submit = () => {
     if (draft.trim()) {
       onSubmit(draft.trim())
@@ -105,58 +121,72 @@ const Composer = ({ placeholder, onSubmit }: { placeholder: string; onSubmit: (b
   }
 
   return (
-    <div className="gr-composer">
+    <div className="gr-composer" onClick={() => field.current?.focus()}>
       <textarea
-        rows={draft ? 3 : 1}
+        ref={field}
+        rows={1}
+        autoFocus={autoFocus}
         value={draft}
         placeholder={placeholder}
-        onChange={event => setDraft(event.target.value)}
+        onChange={event => {
+          setDraft(event.target.value)
+          grow(event.target)
+        }}
         onKeyDown={event => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault()
             submit()
+          }
+          if (event.key === 'Escape') {
+            onCancel?.()
           }
         }}
       />
-      <button disabled={!draft.trim()} onClick={submit}>
-        Reply
-      </button>
-    </div>
-  )
-}
-
-/** NewCommentBox is the composer shown when a line is first clicked. */
-export const NewCommentBox = ({ onSubmit, onCancel }: { onSubmit: (body: string) => void; onCancel: () => void }) => {
-  const [draft, setDraft] = useState('')
-  const submit = () => {
-    if (draft.trim()) {
-      onSubmit(draft.trim())
-    }
-  }
-
-  return (
-    <div className="gr-thread">
-      <div className="gr-composer">
-        <textarea
-          autoFocus
-          rows={3}
-          value={draft}
-          placeholder="Leave a comment…  (Cmd/Ctrl+Enter to save)"
-          onChange={event => setDraft(event.target.value)}
-          onKeyDown={event => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-              submit()
-            }
-            if (event.key === 'Escape') {
-              onCancel()
-            }
-          }}
-        />
-        <button disabled={!draft.trim()} onClick={submit}>
-          Comment
+      <div className="gr-composer-buttons">
+        <button className="gr-send" disabled={!draft.trim()} onClick={submit}>
+          <ReturnIcon />
+          {submitLabel}
         </button>
       </div>
     </div>
   )
+}
+
+/** ReturnIcon is the key the send button answers to. */
+const ReturnIcon = () => (
+  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+    <path
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M13.5 3.5v3.5a2 2 0 0 1-2 2H3.5M6.5 6 3.5 9l3 3"
+    />
+  </svg>
+)
+
+/** CloseIcon is the way out of a comment box nothing has been written in yet. */
+const CloseIcon = () => (
+  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+    <path fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" d="M4 4l8 8M12 4l-8 8" />
+  </svg>
+)
+
+/** NewCommentBox is the composer shown when a line is first clicked. */
+export const NewCommentBox = ({ onSubmit, onCancel }: { onSubmit: (body: string) => void; onCancel: () => void }) => (
+  <div className="gr-thread fresh">
+    <button className="gr-close" aria-label="Close" title="Close" onClick={onCancel}>
+      <CloseIcon />
+    </button>
+    <Composer placeholder="Leave a comment…" submitLabel="Comment" autoFocus onSubmit={onSubmit} onCancel={onCancel} />
+  </div>
+)
+
+/** grow keeps the field the height of the draft it holds. */
+function grow(field: HTMLTextAreaElement): void {
+  field.style.height = 'auto'
+  field.style.height = `${field.scrollHeight}px`
 }
 
 /** preview is the one-line summary a resolved thread collapses to. */

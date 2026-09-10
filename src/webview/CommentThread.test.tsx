@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import type { Thread } from '../core/types.js'
-import { CommentThread } from './CommentThread.js'
+import { CommentThread, NewCommentBox } from './CommentThread.js'
 import { post } from './vscodeApi.js'
 
 vi.mock('./vscodeApi.js', () => ({ post: vi.fn() }))
@@ -37,5 +37,65 @@ describe('CommentThread', () => {
     render(<CommentThread thread={thread} />)
 
     expect(screen.getAllByLabelText('Delete comment')).toHaveLength(2)
+  })
+
+  it('sends the reply on Enter', () => {
+    render(<CommentThread thread={thread} />)
+    const field = screen.getByRole('textbox')
+
+    fireEvent.change(field, { target: { value: 'looks right' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+
+    expect(post).toHaveBeenCalledWith({ type: 'reply', threadId: 't1', body: 'looks right' })
+  })
+
+  it('keeps writing on Shift+Enter', () => {
+    render(<CommentThread thread={thread} />)
+    const field = screen.getByRole('textbox')
+
+    fireEvent.change(field, { target: { value: 'one' } })
+    fireEvent.keyDown(field, { key: 'Enter', shiftKey: true })
+
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('starts typing when the composer region is clicked', () => {
+    const { container } = render(<CommentThread thread={thread} />)
+
+    fireEvent.click(container.querySelector('.gr-composer') as HTMLElement)
+
+    expect(document.activeElement).toBe(screen.getByRole('textbox'))
+  })
+
+  it('marks the agent comment and leaves the reader own unmarked', () => {
+    render(<CommentThread thread={thread} />)
+
+    expect(screen.getAllByTitle('agent')).toHaveLength(1)
+    expect(screen.queryByText('agent')).toBeNull()
+  })
+})
+
+describe('NewCommentBox', () => {
+  afterEach(cleanup)
+
+  it('closes from the corner rather than a cancel button', () => {
+    const onCancel = vi.fn()
+    render(<NewCommentBox onSubmit={vi.fn()} onCancel={onCancel} />)
+
+    screen.getByLabelText('Close').click()
+
+    expect(onCancel).toHaveBeenCalled()
+    expect(screen.queryByText('Cancel')).toBeNull()
+  })
+
+  it('saves the first comment on Enter', () => {
+    const onSubmit = vi.fn()
+    render(<NewCommentBox onSubmit={onSubmit} onCancel={vi.fn()} />)
+    const field = screen.getByRole('textbox')
+
+    fireEvent.change(field, { target: { value: 'a thought' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+
+    expect(onSubmit).toHaveBeenCalledWith('a thought')
   })
 })
