@@ -9,6 +9,7 @@ import {
   type ChangeData,
   type DiffType,
   type FileData,
+  type GutterOptions,
   type HunkData,
   type HunkTokens,
   type RenderToken,
@@ -235,6 +236,7 @@ const DiffTable = ({
     tokens={tokens}
     widgets={widgets}
     renderToken={renderToken}
+    renderGutter={renderGutter}
     gutterEvents={{
       onClick: ({ change }) => {
         if (change) {
@@ -244,6 +246,14 @@ const DiffTable = ({
     }}
   />
 )
+
+/** renderGutter empties the old column, leaving one run of new line numbers with a dash for a line taken away. */
+const renderGutter = ({ change, side, renderDefault }: GutterOptions): ReactNode => {
+  if (side === 'old') {
+    return null
+  }
+  return change.type === 'delete' ? '−' : renderDefault()
+}
 
 /** BinaryNote stands in for a diff that cannot be rendered or commented on. */
 const BinaryNote = () => <div className="gr-file-note">Binary file — not shown.</div>

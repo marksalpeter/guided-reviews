@@ -253,6 +253,31 @@ describe('FileDiff', () => {
     expect(read.indexOf('line34')).toBeLessThan(read.indexOf('7 lines unchanged'))
   })
 
+  it('numbers a line once, on the new side, and dashes the line that was taken away', () => {
+    show()
+
+    const gutters = [...document.querySelectorAll('.diff-line')].map(row =>
+      [...row.querySelectorAll('.diff-gutter')].map(cell => cell.textContent),
+    )
+
+    expect(gutters).toEqual([
+      ['', '31'],
+      ['', '\u2212'],
+      ['', '32'],
+      ['', '33'],
+    ])
+  })
+
+  it('still anchors a comment to the old side from the one gutter a deleted line has', () => {
+    show()
+
+    fireEvent.click(screen.getByText('\u2212'))
+    fireEvent.change(screen.getByPlaceholderText('Leave a comment\u2026'), { target: { value: 'on the deletion' } })
+    fireEvent.click(screen.getByText('Comment'))
+
+    expect(post).toHaveBeenCalledWith(expect.objectContaining({ type: 'startThread', side: 'old', line: 32 }))
+  })
+
   it('attaches a new-side comment only to the added line, not the deleted line of the same number', () => {
     show(true, [lineThread('new', 32, 'note on the addition')])
 

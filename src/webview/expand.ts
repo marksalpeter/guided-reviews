@@ -72,13 +72,13 @@ export function hiddenIn(gap: Gap): number {
   return sizeOf(gap) - gap.shown
 }
 
-/** gutterDigits is how many characters the widest line number a file can show takes up. */
+/** gutterDigits is how many characters the widest number the one gutter shows takes up. */
 export function gutterDigits(hunks: readonly HunkData[], lineCount: number): number {
   const last = hunks[hunks.length - 1]
   // a run past the last hunk reaches the end of the file, so the source outruns the patch
   const oldEnd = Math.max(lineCount, last ? last.oldStart + last.oldLines - 1 : 1)
-  const newEnd = oldEnd + deltaOf(last, undefined)
-  return String(Math.max(oldEnd, newEnd, 1)).length
+  // only the new side is ever printed, so the old numbers do not set the width
+  return String(Math.max(oldEnd + deltaOf(last, undefined), 1)).length
 }
 
 /** deltaOf is what the old line numbers around a pair of hunks are shifted by on the new side. */

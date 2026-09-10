@@ -517,8 +517,8 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   --diff-selection-background-color: var(--vscode-editor-selectionBackground, #264f78);
   --diff-gutter-insert-background-color: var(--vscode-diffEditor-insertedLineBackground);
   --diff-gutter-delete-background-color: var(--vscode-diffEditor-removedLineBackground);
-  --diff-gutter-insert-text-color: var(--vscode-editorLineNumber-foreground);
-  --diff-gutter-delete-text-color: var(--vscode-editorLineNumber-foreground);
+  --diff-gutter-insert-text-color: var(--vscode-gitDecoration-addedResourceForeground);
+  --diff-gutter-delete-text-color: var(--vscode-gitDecoration-deletedResourceForeground);
   --diff-code-insert-background-color: var(--vscode-diffEditor-insertedLineBackground);
   --diff-code-delete-background-color: var(--vscode-diffEditor-removedLineBackground);
   --diff-code-insert-edit-background-color: var(--vscode-diffEditor-insertedTextBackground);
@@ -534,12 +534,23 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 .diff { font-size: var(--vscode-editor-font-size); }
 
-/* the library sizes both gutters at a flat 7ch, which strands a two-digit number in the
-   middle of its column; FileDiff sets --gr-line-ch to the widest number the file can show,
-   so the numbers sit against the code they mark */
-.gr-file { --gr-line-pad: 0.7ch; --gr-line-col: calc(var(--gr-line-ch, 4) * 1ch + 2 * var(--gr-line-pad)); }
+/* the library gives each side a 7ch gutter of its own, which strands a two-digit number in
+   the middle of its column and prints the same number twice on every unchanged line. The old
+   column is emptied by renderGutter and collapses to the bar marking the change, leaving one
+   run of numbers as wide as the widest --gr-line-ch the file can show. */
+.gr-file {
+  --gr-line-pad: 0.7ch;
+  --gr-line-bar: 3px;
+  --gr-line-col: calc(var(--gr-line-ch, 4) * 1ch + 2 * var(--gr-line-pad));
+}
 .diff-gutter-col { width: var(--gr-line-col); }
+.diff-gutter-col:first-child { width: var(--gr-line-bar); }
 .diff-gutter { cursor: pointer; user-select: none; padding: 0 var(--gr-line-pad); }
+.diff-gutter:first-child { padding: 0; }
+
+/* the collapsed column is the only mark a changed line gets outside its own tint */
+.diff-gutter-insert:first-child { background: var(--vscode-gitDecoration-addedResourceForeground); }
+.diff-gutter-delete:first-child { background: var(--vscode-gitDecoration-deletedResourceForeground); }
 .diff-gutter:hover { color: var(--vscode-editorLineNumber-activeForeground); }
 .diff-code-edit, .diff-code-mark { border-radius: 2px; }
 .diff-decoration { color: var(--vscode-descriptionForeground); background: var(--vscode-editor-background); }
@@ -589,8 +600,8 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 }
 .gr-fold-act:hover .gr-caret { color: var(--vscode-foreground); }
 
-/* two gutters wide, so the label starts where the code does */
-.gr-fold-caret { flex: 0 0 calc(2 * var(--gr-line-col)); display: flex; align-items: center; justify-content: center; }
+/* the bar and the gutter together, so the label starts where the code does */
+.gr-fold-caret { flex: 0 0 calc(var(--gr-line-bar) + var(--gr-line-col)); display: flex; align-items: center; justify-content: center; }
 .gr-fold-label { padding-left: 0.5em; }
 
 /* what a run hides is worth saying on the bar itself, since the reader cannot see it */
