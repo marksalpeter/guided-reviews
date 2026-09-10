@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   Diff,
   computeNewLineNumber,
@@ -16,7 +16,7 @@ import {
 import type { ChangedFile, Thread } from '../core/types.js'
 import { Caret } from './Caret.js'
 import { CommentThread, NewCommentBox, type Quote } from './CommentThread.js'
-import { borrowedHunk, expandStep, gapsOf, hiddenIn, sizeOf, type Expansions, type Gap } from './expand.js'
+import { borrowedHunk, expandStep, gapsOf, gutterDigits, hiddenIn, sizeOf, type Expansions, type Gap } from './expand.js'
 import { languageForPath, plaintext, type HastNode, type RefractorLike } from './highlight.js'
 import { classNameOf, markClassName, styleOf } from './tokens.js'
 import { post } from './vscodeApi.js'
@@ -81,7 +81,11 @@ export const FileDiff = ({
   }
 
   return (
-    <section className={`gr-file${reviewed ? ' reviewed' : ''}`} id={fileAnchorId(pathOf(file))}>
+    <section
+      className={`gr-file${reviewed ? ' reviewed' : ''}`}
+      id={fileAnchorId(pathOf(file))}
+      style={{ '--gr-line-ch': gutterDigits(file.hunks, source?.length ?? 0) } as CSSProperties}
+    >
       <header className="gr-file-header">
         <button
           className="gr-file-toggle"

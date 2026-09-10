@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseDiff } from 'react-diff-view'
-import { borrowedHunk, gapsOf, hiddenIn } from './expand.js'
+import { borrowedHunk, gapsOf, gutterDigits, hiddenIn } from './expand.js'
 
 const source = Array.from({ length: 40 }, (_, i) => `line${i + 1}`)
 
@@ -70,5 +70,24 @@ describe('hiddenIn', () => {
 
     expect(middle!.shown).toBe(13)
     expect(hiddenIn(middle!)).toBe(0)
+  })
+})
+
+describe('gutterDigits', () => {
+  it('counts the digits of the last line, not the last one the patch touches', () => {
+    expect(gutterDigits(hunks, source.length)).toBe(2)
+    expect(gutterDigits(hunks, 1200)).toBe(4)
+  })
+
+  it('counts the new side when the change pushes it past the old one', () => {
+    const grown = parseDiff(
+      ['diff --git a/a.txt b/a.txt', '--- a/a.txt', '+++ b/a.txt', '@@ -9,1 +9,2 @@', ' line9', '+line10', ''].join('\n'),
+    )[0]?.hunks ?? []
+
+    expect(gutterDigits(grown, 9)).toBe(2)
+  })
+
+  it('holds a digit open for a file with no hunks at all', () => {
+    expect(gutterDigits([], 0)).toBe(1)
   })
 })

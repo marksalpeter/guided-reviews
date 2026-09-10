@@ -533,7 +533,13 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 }
 
 .diff { font-size: var(--vscode-editor-font-size); }
-.diff-gutter { cursor: pointer; user-select: none; }
+
+/* the library sizes both gutters at a flat 7ch, which strands a two-digit number in the
+   middle of its column; FileDiff sets --gr-line-ch to the widest number the file can show,
+   so the numbers sit against the code they mark */
+.gr-file { --gr-line-pad: 0.7ch; --gr-line-col: calc(var(--gr-line-ch, 4) * 1ch + 2 * var(--gr-line-pad)); }
+.diff-gutter-col { width: var(--gr-line-col); }
+.diff-gutter { cursor: pointer; user-select: none; padding: 0 var(--gr-line-pad); }
 .diff-gutter:hover { color: var(--vscode-editorLineNumber-activeForeground); }
 .diff-code-edit, .diff-code-mark { border-radius: 2px; }
 .diff-decoration { color: var(--vscode-descriptionForeground); background: var(--vscode-editor-background); }
@@ -584,7 +590,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .gr-fold-act:hover .gr-caret { color: var(--vscode-foreground); }
 
 /* two gutters wide, so the label starts where the code does */
-.gr-fold-caret { flex: 0 0 14ch; display: flex; align-items: center; justify-content: center; }
+.gr-fold-caret { flex: 0 0 calc(2 * var(--gr-line-col)); display: flex; align-items: center; justify-content: center; }
 .gr-fold-label { padding-left: 0.5em; }
 
 /* what a run hides is worth saying on the bar itself, since the reader cannot see it */
@@ -640,7 +646,8 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 /* ── threads ───────────────────────────────────────────────────────────── */
 
-.gr-widget { padding: 8px 10px 10px 52px; border-top: 1px solid var(--vscode-panel-border); border-bottom: 1px solid var(--vscode-panel-border); }
+/* a thread hangs off the line it marks, not off a column of its own */
+.gr-widget { padding: 8px 10px 10px 12px; border-top: 1px solid var(--vscode-panel-border); border-bottom: 1px solid var(--vscode-panel-border); }
 
 .gr-thread {
   position: relative;
