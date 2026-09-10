@@ -433,8 +433,13 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   border-radius: var(--gr-card-radius);
 }
 
+/* the corner has to be clipped, not just declared: the tint of a changed line and the ground
+   of a fold bar are painted by descendants, which a radius on their container does not round */
 .gr-file > *:last-child,
-.gr-diff > *:last-child { border-radius: 0 0 calc(var(--gr-card-radius) - 1px) calc(var(--gr-card-radius) - 1px); }
+.gr-diff > *:last-child {
+  border-radius: 0 0 calc(var(--gr-card-radius) - 1px) calc(var(--gr-card-radius) - 1px);
+  overflow: clip;
+}
 
 /* a shut file is header alone, so it rounds at both ends and keeps no rule under it */
 .gr-file > .gr-file-header:last-child {
