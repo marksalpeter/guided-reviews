@@ -717,7 +717,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   cursor: text;
 }
 
-.gr-thread.fresh .gr-composer { margin-top: -10px; padding-top: 31px; border-top: none; }
+.gr-thread.fresh .gr-composer { margin-top: -10px; padding-top: 23px; border-top: none; }
 .gr-thread.fresh .gr-composer textarea { padding-right: 24px; }
 
 .gr-composer textarea {
