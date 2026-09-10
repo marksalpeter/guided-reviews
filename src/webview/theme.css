@@ -436,6 +436,12 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .gr-file > *:last-child,
 .gr-diff > *:last-child { border-radius: 0 0 calc(var(--gr-card-radius) - 1px) calc(var(--gr-card-radius) - 1px); }
 
+/* a shut file is header alone, so it rounds at both ends and keeps no rule under it */
+.gr-file > .gr-file-header:last-child {
+  border-radius: calc(var(--gr-card-radius) - 1px);
+  border-bottom: none;
+}
+
 .gr-file.reviewed { opacity: 0.6; }
 .gr-file.reviewed:hover { opacity: 1; }
 
@@ -450,6 +456,20 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   font-family: var(--vscode-editor-font-family);
   font-size: 0.92em;
 }
+
+.gr-file-header > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.gr-file-header > .gr-file-toggle,
+.gr-file-header > .gr-stat-add,
+.gr-file-header > .gr-stat-del,
+.gr-file-header > .gr-badge,
+.gr-file-header > .gr-reviewed { flex: none; }
 
 .gr-file-toggle {
   display: flex;
@@ -793,7 +813,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   cursor: text;
 }
 
-.gr-thread.fresh .gr-composer { margin-top: -10px; padding-top: 23px; border-top: none; }
+.gr-thread.fresh .gr-composer { margin-top: -10px; padding-top: 31px; border-top: none; }
 .gr-thread.fresh .gr-composer textarea { padding-right: 24px; }
 
 .gr-composer textarea {

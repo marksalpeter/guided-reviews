@@ -12,6 +12,13 @@ import { GuideStatus } from './GuideStatus.js'
 import { activeTheme, loadRefractor, type RefractorLike } from './highlight.js'
 import { loadViewState, post, saveViewState } from './vscodeApi.js'
 
+/** withPath adds or drops one path from a set, leaving the set it was given alone. */
+export function withPath(paths: ReadonlySet<string>, path: string, present: boolean): Set<string> {
+  const next = new Set(paths)
+  present ? next.add(path) : next.delete(path)
+  return next
+}
+
 /** focusRevealFrames is how many frames a deep-linked thread is given to render before giving up. */
 const focusRevealFrames = 60
 
@@ -49,12 +56,11 @@ export const App = () => {
     document.getElementById(fileAnchorId(path))?.scrollIntoView({ block: 'start' })
   }, [])
 
-  const toggleCollapsed = useCallback((path: string) => {
-    setCollapsed(previous => {
-      const next = new Set(previous)
-      next.has(path) ? next.delete(path) : next.add(path)
-      return next
-    })
+  // a reviewed file is shut without being collapsed, so the toggle flips what is on screen
+  // rather than one of the two things that can hold it shut
+  const toggleCollapsed = useCallback((path: string, hidden: boolean) => {
+    setCollapsed(previous => withPath(previous, path, !hidden))
+    setForced(previous => withPath(previous, path, hidden))
   }, [])
 
   if (fatal) {
@@ -100,7 +106,7 @@ export const App = () => {
                     reviewed={isReviewed(reviewedBlobs[path], meta?.newBlob)}
                     collapsed={collapsed.has(path)}
                     forced={forced.has(path)}
-                    onToggleCollapsed={() => toggleCollapsed(path)}
+                    onToggleCollapsed={hidden => toggleCollapsed(path, hidden)}
                     onToggleReviewed={() =>
                       isReviewed(reviewedBlobs[path], meta?.newBlob)
                         ? post({ type: 'unmarkReviewed', path })

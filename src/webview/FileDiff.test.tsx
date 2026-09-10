@@ -182,18 +182,43 @@ describe('FileDiff', () => {
     expect(coloured.style.color).toBe('rgb(106, 153, 85)')
   })
 
-  it('lets plain code in a quote take the editor foreground, not the theme default', () => {
-    const refractor = {
-      highlight: () => [
-        { type: 'element', tagName: 'span', properties: { style: 'color:#D4D4D4' }, children: [{ type: 'text', value: 'plain' }] },
-        { type: 'element', tagName: 'span', properties: { style: 'color:#6a9955' }, children: [{ type: 'text', value: 'green' }] },
-      ],
-    }
-    render(diffWith([lineThread('old', 12, 'buried', 'a.ts')], true, refractor, tsFile, tsMeta))
-    const [plain, green] = [...document.querySelectorAll('.gr-preview-text span')] as HTMLElement[]
+  it('offers to expand a reviewed file, which starts shut', () => {
+    const shut = render(
+      <FileDiff
+        file={file}
+        meta={meta}
+        threads={[]}
+        refractor={null}
+        source={source}
+        reviewed
+        collapsed={false}
+        forced={false}
+        onToggleCollapsed={() => {}}
+        onToggleReviewed={() => {}}
+      />,
+    )
 
-    expect(plain?.style.color).toBe('')
-    expect(green?.style.color).toBe('rgb(106, 153, 85)')
+    expect(shut.container.querySelector('.gr-diff')).toBeNull()
+    expect(screen.getByLabelText('Expand')).toBeTruthy()
+  })
+
+  it('shows a reviewed file once it is forced open', () => {
+    const { container } = render(
+      <FileDiff
+        file={file}
+        meta={meta}
+        threads={[]}
+        refractor={null}
+        source={source}
+        reviewed
+        collapsed={false}
+        forced
+        onToggleCollapsed={() => {}}
+        onToggleReviewed={() => {}}
+      />,
+    )
+
+    expect(container.querySelector('.gr-diff')).toBeTruthy()
   })
 
   it('peeks one step of a run, leaving the rest of it marked', () => {

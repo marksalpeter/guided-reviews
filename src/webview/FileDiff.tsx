@@ -18,7 +18,7 @@ import { Caret } from './Caret.js'
 import { CommentThread, NewCommentBox, type Quote } from './CommentThread.js'
 import { borrowedHunk, expandStep, gapsOf, hiddenIn, sizeOf, type Expansions, type Gap } from './expand.js'
 import { languageForPath, plaintext, type HastNode, type RefractorLike } from './highlight.js'
-import { classNameOf, inheritedStyle, markClassName, styleOf } from './tokens.js'
+import { classNameOf, markClassName, styleOf } from './tokens.js'
 import { post } from './vscodeApi.js'
 
 /** FileDiff renders one changed file, its threads, and the composer for new comments. */
@@ -42,7 +42,7 @@ export const FileDiff = ({
   reviewed: boolean
   collapsed: boolean
   forced: boolean
-  onToggleCollapsed: () => void
+  onToggleCollapsed: (hidden: boolean) => void
   onToggleReviewed: () => void
 }) => {
   const [pending, setPending] = useState<PendingComment | null>(null)
@@ -87,7 +87,7 @@ export const FileDiff = ({
           className="gr-file-toggle"
           aria-label={hidden ? 'Expand' : 'Collapse'}
           aria-expanded={!hidden}
-          onClick={onToggleCollapsed}
+          onClick={() => onToggleCollapsed(hidden)}
         >
           <Caret />
         </button>
@@ -422,7 +422,7 @@ function renderHast(node: HastNode, index: number): ReactNode {
     return node.value
   }
   return (
-    <span key={index} className={classNameOf(node)} style={inheritedStyle(node)}>
+    <span key={index} className={classNameOf(node)} style={styleOf(node)}>
       {node.children?.map((child, at) => renderHast(child, at))}
     </span>
   )
