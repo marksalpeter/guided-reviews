@@ -15,6 +15,7 @@ export const FileList = ({
   <div className="gr-filelist">
     {paths.map(path => {
       const meta = files.find(file => file.path === path)
+      const dir = dirname(path)
       return (
         <button
           key={path}
@@ -23,8 +24,10 @@ export const FileList = ({
           onClick={() => onSelect(path)}
         >
           <FileGlyph />
-          <span className="gr-filecard-name">{basename(path)}</span>
-          <span className="gr-filecard-dir">{dirname(path)}</span>
+          <span className="gr-filecard-path">
+            {dir && <span className="gr-filecard-dir">{dir}/</span>}
+            <span className="gr-filecard-name">{basename(path)}</span>
+          </span>
           <span className="gr-spacer" />
           {meta && meta.additions > 0 && <span className="gr-stat-add">+{meta.additions}</span>}
           {meta && meta.deletions > 0 && <span className="gr-stat-del">−{meta.deletions}</span>}

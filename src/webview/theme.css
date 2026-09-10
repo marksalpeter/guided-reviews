@@ -347,16 +347,17 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .gr-filecard.reviewed { opacity: 0.55; }
 .gr-filecard.reviewed:hover { opacity: 1; }
 .gr-filecard-icon { flex: 0 0 auto; color: var(--vscode-descriptionForeground); }
-.gr-filecard-name { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gr-filecard-dir {
+/* the whole path, cut from the head so the name it ends with is the part that survives */
+.gr-filecard-path {
   flex: 0 1 auto;
-  color: var(--vscode-descriptionForeground);
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   direction: rtl;
   text-align: left;
 }
+.gr-filecard-dir { color: var(--vscode-descriptionForeground); }
 
 /* ── floating guide pill ───────────────────────────────────────────────── */
 
