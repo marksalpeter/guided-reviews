@@ -18,7 +18,7 @@ import { Caret } from './Caret.js'
 import { CommentThread, NewCommentBox, type Quote } from './CommentThread.js'
 import { borrowedHunk, expandStep, gapsOf, hiddenIn, sizeOf, type Expansions, type Gap } from './expand.js'
 import { languageForPath, plaintext, type HastNode, type RefractorLike } from './highlight.js'
-import { classNameOf, markClassName, styleOf } from './tokens.js'
+import { classNameOf, inheritedStyle, markClassName, styleOf } from './tokens.js'
 import { post } from './vscodeApi.js'
 
 /** FileDiff renders one changed file, its threads, and the composer for new comments. */
@@ -422,7 +422,7 @@ function renderHast(node: HastNode, index: number): ReactNode {
     return node.value
   }
   return (
-    <span key={index} className={classNameOf(node)} style={styleOf(node)}>
+    <span key={index} className={classNameOf(node)} style={inheritedStyle(node)}>
       {node.children?.map((child, at) => renderHast(child, at))}
     </span>
   )

@@ -182,6 +182,20 @@ describe('FileDiff', () => {
     expect(coloured.style.color).toBe('rgb(106, 153, 85)')
   })
 
+  it('lets plain code in a quote take the editor foreground, not the theme default', () => {
+    const refractor = {
+      highlight: () => [
+        { type: 'element', tagName: 'span', properties: { style: 'color:#D4D4D4' }, children: [{ type: 'text', value: 'plain' }] },
+        { type: 'element', tagName: 'span', properties: { style: 'color:#6a9955' }, children: [{ type: 'text', value: 'green' }] },
+      ],
+    }
+    render(diffWith([lineThread('old', 12, 'buried', 'a.ts')], true, refractor, tsFile, tsMeta))
+    const [plain, green] = [...document.querySelectorAll('.gr-preview-text span')] as HTMLElement[]
+
+    expect(plain?.style.color).toBe('')
+    expect(green?.style.color).toBe('rgb(106, 153, 85)')
+  })
+
   it('peeks one step of a run, leaving the rest of it marked', () => {
     show()
 

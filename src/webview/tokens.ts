@@ -1,6 +1,9 @@
 /** editClassName is react-diff-view's wrapper for a word-level changed run. */
 const editClassName = 'diff-code-edit'
 
+/** themeForegrounds are the colours Dark+ and Light+ stamp on code no grammar rule claims. */
+const themeForegrounds = new Set(['#d4d4d4', '#000000'])
+
 /** styleOf converts Shiki's inline style string into a React style object. */
 export function styleOf(token: StyledToken): Record<string, string> | undefined {
   const declarations = token.properties?.style
@@ -20,6 +23,17 @@ export function styleOf(token: StyledToken): Record<string, string> | undefined 
     }
   }
   return Object.keys(style).length > 0 ? style : undefined
+}
+
+/** inheritedStyle is styleOf without a colour the editor's own foreground already gives. */
+export function inheritedStyle(token: StyledToken): Record<string, string> | undefined {
+  const style = styleOf(token)
+  if (!style || !themeForegrounds.has(String(style.color).toLowerCase())) {
+    return style
+  }
+  const rest = { ...style }
+  delete rest.color
+  return Object.keys(rest).length > 0 ? rest : undefined
 }
 
 /** classNameOf reads whichever class shape the token carries. */
