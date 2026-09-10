@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Comment, Thread } from '../core/types.js'
 import { post } from './vscodeApi.js'
 
@@ -87,7 +87,7 @@ const QuoteBand = ({ quote }: { quote: Quote }) => {
           {window(from, to).map(line => (
             <tr key={line} className={line === quote.line ? 'subject' : undefined}>
               <td className="gr-preview-num">{line}</td>
-              <td className="gr-preview-text">{quote.source[line - 1] ?? ''}</td>
+              <td className="gr-preview-text">{quote.highlight(quote.source[line - 1] ?? '')}</td>
             </tr>
           ))}
         </tbody>
@@ -253,4 +253,5 @@ export interface Quote {
   from: number
   to: number
   source: readonly string[]
+  highlight: (text: string) => ReactNode
 }

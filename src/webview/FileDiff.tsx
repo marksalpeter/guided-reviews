@@ -17,7 +17,7 @@ import type { ChangedFile, Thread } from '../core/types.js'
 import { Caret } from './Caret.js'
 import { CommentThread, NewCommentBox, type Quote } from './CommentThread.js'
 import { borrowedHunk, expandStep, gapsOf, hiddenIn, sizeOf, type Expansions, type Gap } from './expand.js'
-import { languageForPath, plaintext, type RefractorLike } from './highlight.js'
+import { languageForPath, plaintext, type HastNode, type RefractorLike } from './highlight.js'
 import { classNameOf, markClassName, styleOf } from './tokens.js'
 import { post } from './vscodeApi.js'
 
@@ -56,6 +56,7 @@ export const FileDiff = ({
   const borrowed = useBorrowed(gaps, source)
   const hunks = useMemo(() => [...file.hunks, ...borrowed.values()], [file, borrowed])
   const tokens = useTokens(file, hunks, refractor)
+  const highlight = useHighlighter(file, refractor)
   const widgets = useWidgets(file, hunks, threads, pending, setPending)
 
   const table = (hunk: HunkData) => (
@@ -72,6 +73,7 @@ export const FileDiff = ({
         gap={gap}
         buried={buriedIn(gap, threads)}
         source={source ?? []}
+        highlight={highlight}
         lines={lines ? table(lines) : null}
         onChange={shown => setExpansions(previous => ({ ...previous, [gap.index]: shown }))}
       />
@@ -123,12 +125,14 @@ const Fold = ({
   gap,
   buried,
   source,
+  highlight,
   lines,
   onChange,
 }: {
   gap: Gap
   buried: Thread[]
   source: readonly string[]
+  highlight: (text: string) => ReactNode
   lines: ReactNode
   onChange: (shown: number) => void
 }) => {
@@ -145,7 +149,7 @@ const Fold = ({
       {buried.length > 0 && (
         <div className="gr-fold-notes">
           {buried.map(thread => (
-            <CommentThread key={thread.id} thread={thread} quote={quoteOf(gap, thread, source)} />
+            <CommentThread key={thread.id} thread={thread} quote={quoteOf(gap, thread, source, highlight)} />
           ))}
         </div>
       )}
@@ -247,6 +251,23 @@ function useBaseText(blob: string | undefined, hidden: boolean, source: string[]
       post({ type: 'loadSource', blob })
     }
   }, [blob, hidden, source])
+}
+
+/** useHighlighter colours one line of the base text the way the diff colours its own. */
+function useHighlighter(file: FileData, refractor: RefractorLike | null): (text: string) => ReactNode {
+  return useMemo(() => {
+    const language = languageForPath(pathOf(file))
+    if (!refractor || language === plaintext) {
+      return (text: string) => text
+    }
+    return (text: string) => {
+      try {
+        return refractor.highlight(text, language).map((node, index) => renderHast(node, index))
+      } catch {
+        return text
+      }
+    }
+  }, [file, refractor])
 }
 
 /** useSettledPending drops a new comment box once the thread the host wrote for it arrives. */
@@ -395,6 +416,18 @@ function threadLine(thread: Thread): number | undefined {
   return thread.anchor.kind === 'line' ? (thread.resolvedLine ?? thread.anchor.line) : undefined
 }
 
+/** renderHast draws one syntax node, keeping the inline colours the grammar gave it. */
+function renderHast(node: HastNode, index: number): ReactNode {
+  if (node.type === 'text') {
+    return node.value
+  }
+  return (
+    <span key={index} className={classNameOf(node)} style={styleOf(node)}>
+      {node.children?.map((child, at) => renderHast(child, at))}
+    </span>
+  )
+}
+
 /** onSameLine reports whether a thread is anchored where a new comment box is waiting. */
 function onSameLine(thread: Thread, pending: PendingComment): boolean {
   return (
@@ -405,9 +438,14 @@ function onSameLine(thread: Thread, pending: PendingComment): boolean {
 }
 
 /** quoteOf is the hidden line a listed thread points at, within the reach of its own run. */
-function quoteOf(gap: Gap, thread: Thread, source: readonly string[]): Quote | undefined {
+function quoteOf(
+  gap: Gap,
+  thread: Thread,
+  source: readonly string[],
+  highlight: (text: string) => ReactNode,
+): Quote | undefined {
   const line = hiddenLine(gap, thread)
-  return line === undefined ? undefined : { line, from: gap.start, to: gap.end, source }
+  return line === undefined ? undefined : { line, from: gap.start, to: gap.end, source, highlight }
 }
 
 /** buriedIn is the threads left on lines a run is still hiding. */

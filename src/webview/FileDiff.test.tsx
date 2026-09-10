@@ -3,6 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { parseDiff, type FileData } from 'react-diff-view'
 import type { AnchorSide, ChangedFile, Thread } from '../core/types.js'
+import type { RefractorLike } from './highlight.js'
 import { FileDiff } from './FileDiff.js'
 import { post } from './vscodeApi.js'
 
@@ -35,19 +36,30 @@ const meta: ChangedFile = {
 /** file is the one parsed file the patch describes. */
 const file = parseDiff(patch)[0] as FileData
 
+/** tsFile is the same patch under a name the highlighter knows a grammar for. */
+const tsFile = parseDiff(patch.replaceAll('a.txt', 'a.ts'))[0] as FileData
+
+const tsMeta: ChangedFile = { ...meta, path: 'a.ts' }
+
 /** show renders the diff with the base text already in hand. */
 function show(withSource = true, threads: Thread[] = []) {
   return render(diffWith(threads, withSource))
 }
 
 /** diffWith is the element show renders, so a test can hand the same diff new threads. */
-function diffWith(threads: Thread[] = [], withSource = true) {
+function diffWith(
+  threads: Thread[] = [],
+  withSource = true,
+  refractor: RefractorLike | null = null,
+  shown: FileData = file,
+  about: ChangedFile = meta,
+) {
   return (
     <FileDiff
-      file={file}
-      meta={meta}
+      file={shown}
+      meta={about}
       threads={threads}
-      refractor={null}
+      refractor={refractor}
       source={withSource ? source : undefined}
       reviewed={false}
       collapsed={false}
@@ -59,10 +71,10 @@ function diffWith(threads: Thread[] = [], withSource = true) {
 }
 
 /** lineThread pins a one-comment thread to a line on the given side. */
-function lineThread(side: AnchorSide, line: number, body: string): Thread {
+function lineThread(side: AnchorSide, line: number, body: string, path = 'a.txt'): Thread {
   return {
     id: `t-${side}-${line}`,
-    anchor: { kind: 'line', path: 'a.txt', side, line, blob: side === 'new' ? 'head' : 'base', text: '', contextHash: '' },
+    anchor: { kind: 'line', path, side, line, blob: side === 'new' ? 'head' : 'base', text: '', contextHash: '' },
     state: 'open',
     comments: [{ id: 'c1', author: 'human', body, at: '2026-01-01T00:00:00Z' }],
     createdAt: '2026-01-01T00:00:00Z',
@@ -155,6 +167,19 @@ describe('FileDiff', () => {
 
     expect(container.querySelectorAll('.gr-thread.fresh')).toHaveLength(0)
     expect(screen.getByText('a first thought')).toBeTruthy()
+  })
+
+  it('colours a listed thread quote the way the diff colours its own code', () => {
+    const refractor = {
+      highlight: (value: string) => [
+        { type: 'element', tagName: 'span', properties: { style: 'color:#6a9955' }, children: [{ type: 'text', value }] },
+      ],
+    }
+    render(diffWith([lineThread('old', 12, 'buried', 'a.ts')], true, refractor, tsFile, tsMeta))
+
+    const coloured = document.querySelector('.gr-preview-text span') as HTMLElement
+
+    expect(coloured.style.color).toBe('rgb(106, 153, 85)')
   })
 
   it('peeks one step of a run, leaving the rest of it marked', () => {
