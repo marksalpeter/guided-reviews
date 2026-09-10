@@ -712,12 +712,12 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 }
 .gr-composer {
   margin: 0 -8px -10px -12px;
-  padding: 9px 8px 10px 27px;
+  padding: 21px 8px 10px 27px;
   border-top: 1px solid var(--vscode-panel-border);
   cursor: text;
 }
 
-.gr-thread.fresh .gr-composer { margin-top: -10px; padding: 10px; border-top: none; }
+.gr-thread.fresh .gr-composer { margin-top: -10px; padding-top: 31px; border-top: none; }
 .gr-thread.fresh .gr-composer textarea { padding-right: 24px; }
 
 .gr-composer textarea {
