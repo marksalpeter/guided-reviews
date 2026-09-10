@@ -104,6 +104,21 @@ describe('ReviewService', () => {
       expect(await service.openSelection(moved)).toContain('..')
     })
 
+    it('reviews a stacked branch against the branch it was chosen to sit on, not the default one', async () => {
+      await exec.run('git', ['checkout', '-qb', 'parent', 'main'])
+      await writeFile(join(dir, 'parent.ts'), 'export const parent = 1\n')
+      await commit('parent work')
+      await exec.run('git', ['checkout', '-qb', 'child'])
+      await writeFile(join(dir, 'child.ts'), 'export const child = 1\n')
+      await commit('child work')
+
+      const key = await service.openSelection(await service.selectionAgainst('child', 'parent'))
+
+      const { state, files } = await service.load(key)
+      expect(state.refs.baseSha).toBe(await service.repo.revParse('parent'))
+      expect(files.map(file => file.path)).toEqual(['child.ts'])
+    })
+
     it('keeps each pair its own event log', async () => {
       const selection = await service.defaultSelection()
       const branchKey = await service.openSelection(selection)

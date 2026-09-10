@@ -228,6 +228,10 @@ export class ReviewService {
     if (selection.branch !== (await this.git.currentBranch())) {
       return false
     }
+    // the branch review is the one against the default branch, so any other base is an ad-hoc pair
+    if (selection.baseBranch !== (await this.git.defaultBranchName())) {
+      return false
+    }
     const [head, fork] = await Promise.all([
       this.git.revParse(selection.branch),
       this.git.mergeBase(selection.baseBranch, selection.branch),
