@@ -37,7 +37,12 @@ const file = parseDiff(patch)[0] as FileData
 
 /** show renders the diff with the base text already in hand. */
 function show(withSource = true, threads: Thread[] = []) {
-  return render(
+  return render(diffWith(threads, withSource))
+}
+
+/** diffWith is the element show renders, so a test can hand the same diff new threads. */
+function diffWith(threads: Thread[] = [], withSource = true) {
+  return (
     <FileDiff
       file={file}
       meta={meta}
@@ -49,7 +54,7 @@ function show(withSource = true, threads: Thread[] = []) {
       forced={false}
       onToggleCollapsed={() => {}}
       onToggleReviewed={() => {}}
-    />,
+    />
   )
 }
 
@@ -134,6 +139,22 @@ describe('FileDiff', () => {
     expect(screen.getByText('line10')).toBeTruthy()
     expect(screen.getByText('line14')).toBeTruthy()
     expect(screen.getByText('30 lines unchanged')).toBeTruthy()
+  })
+
+  it('keeps a new comment box in place until its thread arrives', () => {
+    const { container, rerender } = show(true)
+    const field = () => container.querySelector('textarea') as HTMLTextAreaElement
+
+    fireEvent.click(container.querySelector('.diff-gutter') as HTMLElement)
+    fireEvent.change(field(), { target: { value: 'a first thought' } })
+    fireEvent.keyDown(field(), { key: 'Enter' })
+
+    expect(field().value).toBe('a first thought')
+
+    rerender(diffWith([lineThread('new', 31, 'a first thought')]))
+
+    expect(container.querySelectorAll('.gr-thread.fresh')).toHaveLength(0)
+    expect(screen.getByText('a first thought')).toBeTruthy()
   })
 
   it('peeks one step of a run, leaving the rest of it marked', () => {

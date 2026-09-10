@@ -52,6 +52,7 @@ export const FileDiff = ({
   useEffect(() => setExpansions({}), [file])
 
   const gaps = useGaps(file, source, expansions)
+  useSettledPending(threads, pending, setPending)
   const borrowed = useBorrowed(gaps, source)
   const hunks = useMemo(() => [...file.hunks, ...borrowed.values()], [file, borrowed])
   const tokens = useTokens(file, hunks, refractor)
@@ -248,6 +249,21 @@ function useBaseText(blob: string | undefined, hidden: boolean, source: string[]
   }, [blob, hidden, source])
 }
 
+/** useSettledPending drops a new comment box once the thread the host wrote for it arrives. */
+function useSettledPending(
+  threads: Thread[],
+  pending: PendingComment | null,
+  setPending: (value: PendingComment | null) => void,
+): void {
+  const arrived = pending !== null && threads.some(thread => onSameLine(thread, pending))
+
+  useEffect(() => {
+    if (arrived) {
+      setPending(null)
+    }
+  }, [arrived, setPending])
+}
+
 /** useGaps finds the runs the diff left out, which only the base text can measure. */
 function useGaps(file: FileData, source: string[] | undefined, expansions: Expansions): Gap[] {
   return useMemo(
@@ -319,10 +335,7 @@ function useWidgets(
             {isPending && pending && (
               <NewCommentBox
                 onCancel={() => setPending(null)}
-                onSubmit={body => {
-                  post({ type: 'startThread', path, side: pending.side, line: pending.line, body })
-                  setPending(null)
-                }}
+                onSubmit={body => post({ type: 'startThread', path, side: pending.side, line: pending.line, body })}
               />
             )}
           </div>
@@ -380,6 +393,15 @@ function anchoredAt(thread: Thread, change: ChangeData): boolean {
 /** threadLine is the line a thread currently points at, after relocation. */
 function threadLine(thread: Thread): number | undefined {
   return thread.anchor.kind === 'line' ? (thread.resolvedLine ?? thread.anchor.line) : undefined
+}
+
+/** onSameLine reports whether a thread is anchored where a new comment box is waiting. */
+function onSameLine(thread: Thread, pending: PendingComment): boolean {
+  return (
+    thread.anchor.kind === 'line' &&
+    thread.anchor.side === pending.side &&
+    threadLine(thread) === pending.line
+  )
 }
 
 /** quoteOf is the hidden line a listed thread points at, within the reach of its own run. */

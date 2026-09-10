@@ -67,6 +67,21 @@ describe('CommentThread', () => {
     expect(document.activeElement).toBe(screen.getByRole('textbox'))
   })
 
+  it('keeps a sent reply on screen until the host echoes it back', () => {
+    const { rerender } = render(<CommentThread thread={thread} />)
+    const field = screen.getByRole('textbox')
+
+    fireEvent.change(field, { target: { value: 'still here' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+
+    expect(screen.getByRole('textbox')).toHaveProperty('value', 'still here')
+
+    const echoed = { ...thread, comments: [...thread.comments, { id: 'c3', author: 'human' as const, body: 'still here', at: 'c' }] }
+    rerender(<CommentThread thread={echoed} />)
+
+    expect(screen.getByRole('textbox')).toHaveProperty('value', '')
+  })
+
   it('marks the agent comment and leaves the reader own unmarked', () => {
     render(<CommentThread thread={thread} />)
 

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Comment, Thread } from '../core/types.js'
 import { post } from './vscodeApi.js'
 
@@ -43,6 +43,7 @@ export const CommentThread = ({ thread, quote }: { thread: Thread; quote?: Quote
           <Composer
             placeholder="Reply…"
             submitLabel="Reply"
+            settled={thread.comments.length}
             onSubmit={body => post({ type: 'reply', threadId: thread.id, body })}
           />
         </>
@@ -134,23 +135,35 @@ const Composer = ({
   placeholder,
   submitLabel,
   autoFocus = false,
+  settled,
   onSubmit,
   onCancel,
 }: {
   placeholder: string
   submitLabel: string
   autoFocus?: boolean
+  settled?: number
   onSubmit: (body: string) => void
   onCancel?: () => void
 }) => {
   const [draft, setDraft] = useState('')
+  const [sent, setSent] = useState(false)
   const field = useRef<HTMLTextAreaElement>(null)
   const submit = () => {
     if (draft.trim()) {
       onSubmit(draft.trim())
-      setDraft('')
+      setSent(true)
     }
   }
+
+  // the host writes the comment, reads the diff and pushes a whole payload back, so the draft
+  // stands in for it until then rather than leaving the reader looking at a hole
+  useEffect(() => {
+    if (sent) {
+      setDraft('')
+      setSent(false)
+    }
+  }, [settled])
 
   return (
     <div className="gr-composer" onClick={() => field.current?.focus()}>
