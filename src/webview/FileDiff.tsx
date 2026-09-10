@@ -15,8 +15,8 @@ import {
 } from 'react-diff-view'
 import type { ChangedFile, Thread } from '../core/types.js'
 import { Caret } from './Caret.js'
-import { CommentThread, NewCommentBox } from './CommentThread.js'
-import { borrowedHunk, expandStep, gapsOf, hiddenIn, sizeOf, type Expansions, type Gap, type Pin } from './expand.js'
+import { CommentThread, NewCommentBox, type Quote } from './CommentThread.js'
+import { borrowedHunk, expandStep, gapsOf, hiddenIn, sizeOf, type Expansions, type Gap } from './expand.js'
 import { languageForPath, plaintext, type RefractorLike } from './highlight.js'
 import { classNameOf, markClassName, styleOf } from './tokens.js'
 import { post } from './vscodeApi.js'
@@ -51,7 +51,7 @@ export const FileDiff = ({
   useBaseText(meta?.oldBlob ?? undefined, hidden, source)
   useEffect(() => setExpansions({}), [file])
 
-  const gaps = useGaps(file, source, expansions, threads)
+  const gaps = useGaps(file, source, expansions)
   const borrowed = useBorrowed(gaps, source)
   const hunks = useMemo(() => [...file.hunks, ...borrowed.values()], [file, borrowed])
   const tokens = useTokens(file, hunks, refractor)
@@ -69,6 +69,8 @@ export const FileDiff = ({
     return (
       <Fold
         gap={gap}
+        buried={buriedIn(gap, threads)}
+        source={source ?? []}
         lines={lines ? table(lines) : null}
         onChange={shown => setExpansions(previous => ({ ...previous, [gap.index]: shown }))}
       />
@@ -116,15 +118,37 @@ export const FileDiff = ({
 }
 
 /** Fold is one run of unchanged lines: the bars that open and shut it, and the lines between them. */
-const Fold = ({ gap, lines, onChange }: { gap: Gap; lines: ReactNode; onChange: (shown: number) => void }) => {
+const Fold = ({
+  gap,
+  buried,
+  source,
+  lines,
+  onChange,
+}: {
+  gap: Gap
+  buried: Thread[]
+  source: readonly string[]
+  lines: ReactNode
+  onChange: (shown: number) => void
+}) => {
   const rest = hiddenIn(gap)
   const mark = rest > 0 && (
-    <Bar
-      role="gr-fold-mark"
-      label={`${countOf(rest)} unchanged`}
-      onClick={() => onChange(sizeOf(gap))}
-      onPeek={rest > expandStep ? () => onChange(gap.shown + expandStep) : undefined}
-    />
+    <>
+      <Bar
+        role="gr-fold-mark"
+        label={`${countOf(rest)} unchanged`}
+        note={buried.length > 0 ? `${buried.length} comment${buried.length === 1 ? '' : 's'}` : undefined}
+        onClick={() => onChange(sizeOf(gap))}
+        onPeek={rest > expandStep ? () => onChange(gap.shown + expandStep) : undefined}
+      />
+      {buried.length > 0 && (
+        <div className="gr-fold-notes">
+          {buried.map(thread => (
+            <CommentThread key={thread.id} thread={thread} quote={quoteOf(gap, thread, source)} />
+          ))}
+        </div>
+      )}
+    </>
   )
   const handle = gap.shown > 0 && (
     <Bar role="gr-fold-handle" label={`Collapse ${countOf(gap.shown)}`} onClick={() => onChange(0)} />
@@ -155,11 +179,13 @@ const Fold = ({ gap, lines, onChange }: { gap: Gap; lines: ReactNode; onChange: 
 const Bar = ({
   role,
   label,
+  note,
   onClick,
   onPeek,
 }: {
   role: string
   label: string
+  note?: string
   onClick: () => void
   onPeek?: () => void
 }) => (
@@ -169,6 +195,7 @@ const Bar = ({
         <Caret />
       </span>
       <span className="gr-fold-label">{label}</span>
+      {note && <span className="gr-fold-note">{note}</span>}
     </button>
     {onPeek && (
       <button className="gr-fold-peek" onClick={onPeek}>
@@ -222,14 +249,10 @@ function useBaseText(blob: string | undefined, hidden: boolean, source: string[]
 }
 
 /** useGaps finds the runs the diff left out, which only the base text can measure. */
-function useGaps(file: FileData, source: string[] | undefined, expansions: Expansions, threads: Thread[]): Gap[] {
-  const pinned = threads.filter(thread => thread.status !== 'outdated').flatMap(pinsOf)
-  const signature = pinned.map(pin => `${pin.side}${pin.line}`).join(',')
-
+function useGaps(file: FileData, source: string[] | undefined, expansions: Expansions): Gap[] {
   return useMemo(
-    // the threads arrive as fresh objects each push, so the memo keys on the lines they hold
-    () => (source ? gapsOf(file.hunks, source.length, expansions, pinned) : []),
-    [file, source, expansions, signature],
+    () => (source ? gapsOf(file.hunks, source.length, expansions) : []),
+    [file, source, expansions],
   )
 }
 
@@ -359,10 +382,27 @@ function threadLine(thread: Thread): number | undefined {
   return thread.anchor.kind === 'line' ? (thread.resolvedLine ?? thread.anchor.line) : undefined
 }
 
-/** pinsOf is the line a thread holds open inside a run, on the side it is anchored to. */
-function pinsOf(thread: Thread): Pin[] {
+/** quoteOf is the hidden line a listed thread points at, within the reach of its own run. */
+function quoteOf(gap: Gap, thread: Thread, source: readonly string[]): Quote | undefined {
+  const line = hiddenLine(gap, thread)
+  return line === undefined ? undefined : { line, from: gap.start, to: gap.end, source }
+}
+
+/** buriedIn is the threads left on lines a run is still hiding. */
+function buriedIn(gap: Gap, threads: Thread[]): Thread[] {
+  return threads.filter(thread => {
+    const line = hiddenLine(gap, thread)
+    return line !== undefined && line >= gap.start + gap.shown && line < gap.end
+  })
+}
+
+/** hiddenLine is where a thread sits in a run's own numbering, or nothing if it sits elsewhere. */
+function hiddenLine(gap: Gap, thread: Thread): number | undefined {
   const line = threadLine(thread)
-  return thread.anchor.kind === 'line' && line !== undefined ? [{ side: thread.anchor.side, line }] : []
+  if (thread.status === 'outdated' || thread.anchor.kind !== 'line' || line === undefined) {
+    return undefined
+  }
+  return thread.anchor.side === 'old' ? line : line - gap.delta
 }
 
 /** pathOf is the file's current path, falling back to its pre-rename path. */

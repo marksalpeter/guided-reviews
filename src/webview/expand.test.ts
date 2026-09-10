@@ -40,14 +40,6 @@ describe('gapsOf', () => {
   })
 })
 
-describe('gapsOf pinning', () => {
-  it('opens a run far enough to keep a commented line on screen', () => {
-    const gaps = gapsOf(hunks, source.length, {}, [{ side: 'new', line: 24 }])
-
-    expect(gaps[1]).toMatchObject({ shown: 10 })
-  })
-})
-
 describe('borrowedHunk', () => {
   it('takes a downward run from the line after the hunk above, on both sides of the diff', () => {
     const [, middle] = gapsOf(hunks, source.length, { 1: 4 })

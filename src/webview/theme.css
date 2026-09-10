@@ -567,6 +567,25 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .gr-fold-caret { flex: 0 0 14ch; display: flex; align-items: center; justify-content: center; }
 .gr-fold-label { padding-left: 0.5em; }
 
+/* what a run hides is worth saying on the bar itself, since the reader cannot see it */
+.gr-fold-note {
+  margin-left: 10px;
+  padding: 1px 8px;
+  border: 1px solid var(--vscode-textLink-foreground);
+  border-radius: 999px;
+  color: var(--vscode-textLink-foreground);
+  font-size: 10px;
+}
+
+/* the threads a run hides are listed under its bar, on the bars' own ground */
+.gr-fold-notes {
+  padding: 10px 12px 12px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.gr-fold-notes .gr-thread:last-child { margin-bottom: 0; }
+
 /* a caret points at what its click moves: a mark at the lines it still hides, a handle away
    from the lines it would take back */
 .gr-fold-handle .gr-caret { transform: rotate(180deg); }
@@ -673,6 +692,61 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.gr-preview {
+  margin: -10px -8px 0 -12px;
+  padding: 8px 34px 8px 12px;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  border-radius: calc(var(--gr-card-radius) - 1px) calc(var(--gr-card-radius) - 1px) 0 0;
+}
+
+.gr-preview-head { display: flex; align-items: center; margin-bottom: 6px; }
+
+.gr-preview-line {
+  padding: 1px 8px;
+  background: none;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 999px;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-font-family);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.gr-preview-line:hover {
+  background: none;
+  color: var(--vscode-textLink-foreground);
+  border-color: var(--vscode-textLink-foreground);
+}
+.gr-preview-more { margin-left: 7px; padding-left: 7px; border-left: 1px solid var(--vscode-panel-border); }
+
+.gr-preview-code { border-collapse: collapse; width: 100%; }
+.gr-preview-code td { line-height: 1.5; vertical-align: top; }
+
+.gr-preview-num {
+  width: 5ch;
+  padding-right: 1ch;
+  text-align: right;
+  color: var(--vscode-editorLineNumber-foreground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.gr-preview-text {
+  padding-left: 0.75em;
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  opacity: 0.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.gr-preview-code .subject .gr-preview-text { opacity: 1; }
+.gr-preview-code .subject .gr-preview-num { color: var(--vscode-textLink-foreground); }
 
 .gr-comment { display: flex; align-items: flex-start; gap: 9px; padding: 21px 0; line-height: 1.5; }
 .gr-comment + .gr-comment { border-top: 1px solid var(--vscode-panel-border); }

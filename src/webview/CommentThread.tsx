@@ -8,8 +8,11 @@ export const threadElementId = (threadId: string): string => `gr-thread-${thread
 /** collapsedPreviewLength is how much of the first comment a resolved thread shows. */
 const collapsedPreviewLength = 90
 
+/** contextLines is how far either side of its own line a quote reaches once opened. */
+const contextLines = 2
+
 /** CommentThread renders one conversation: a resolve tick, the messages, and a composer. */
-export const CommentThread = ({ thread }: { thread: Thread }) => {
+export const CommentThread = ({ thread, quote }: { thread: Thread; quote?: Quote }) => {
   const [expanded, setExpanded] = useState(false)
   const resolved = thread.state === 'resolved'
 
@@ -27,6 +30,7 @@ export const CommentThread = ({ thread }: { thread: Thread }) => {
       ) : (
         <>
           {thread.status === 'outdated' && <OutdatedNotice thread={thread} />}
+          {quote && <QuoteBand quote={quote} />}
           <div className="gr-comments">
             {thread.comments.map(comment => (
               <CommentBody
@@ -62,6 +66,34 @@ const ResolveTick = ({ resolved, onToggle }: { resolved: boolean; onToggle: () =
     </svg>
   </button>
 )
+
+/** QuoteBand stands in for the hidden code a thread points at, and opens the lines around it. */
+const QuoteBand = ({ quote }: { quote: Quote }) => {
+  const [context, setContext] = useState(false)
+  const from = context ? Math.max(quote.from, quote.line - contextLines) : quote.line
+  const to = context ? Math.min(quote.to, quote.line + contextLines + 1) : quote.line + 1
+
+  return (
+    <div className="gr-preview">
+      <div className="gr-preview-head">
+        <button className="gr-preview-line" onClick={() => setContext(!context)}>
+          line {quote.line}
+          <span className="gr-preview-more">{context ? 'hide context' : 'show context'}</span>
+        </button>
+      </div>
+      <table className="gr-preview-code">
+        <tbody>
+          {window(from, to).map(line => (
+            <tr key={line} className={line === quote.line ? 'subject' : undefined}>
+              <td className="gr-preview-num">{line}</td>
+              <td className="gr-preview-text">{quote.source[line - 1] ?? ''}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 /** CommentBody renders one message, marking only the agent, with a delete affordance on hover. */
 const CommentBody = ({ comment, onDelete }: { comment: Comment; onDelete: () => void }) => (
@@ -189,10 +221,23 @@ function grow(field: HTMLTextAreaElement): void {
   field.style.height = `${field.scrollHeight}px`
 }
 
+/** window lists the line numbers between two bounds. */
+function window(from: number, to: number): number[] {
+  return Array.from({ length: Math.max(0, to - from) }, (_, offset) => from + offset)
+}
+
 /** preview is the one-line summary a resolved thread collapses to. */
 function preview(thread: Thread): string {
   const first = thread.comments[0]?.body ?? ''
   const extra = thread.comments.length > 1 ? `  +${thread.comments.length - 1}` : ''
   const trimmed = first.length > collapsedPreviewLength ? `${first.slice(0, collapsedPreviewLength)}…` : first
   return `${trimmed}${extra}`
+}
+
+/** Quote is the hidden code a thread points at, and how far around it its run reaches. */
+export interface Quote {
+  line: number
+  from: number
+  to: number
+  source: readonly string[]
 }

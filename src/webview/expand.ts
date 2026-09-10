@@ -28,12 +28,7 @@ export function sourceLines(text: string): string[] {
 }
 
 /** gapsOf lists a file's collapsed runs, each carrying how much of it is currently on screen. */
-export function gapsOf(
-  hunks: readonly HunkData[],
-  lineCount: number,
-  expansions: Expansions,
-  pinned: readonly Pin[] = [],
-): Gap[] {
+export function gapsOf(hunks: readonly HunkData[], lineCount: number, expansions: Expansions): Gap[] {
   if (hunks.length === 0) {
     return []
   }
@@ -47,15 +42,14 @@ export function gapsOf(
     if (end > start) {
       // a run continues the hunk above it; the one at the top of a file has none, so it runs
       // into the hunk below instead
-      const gap: Gap = {
+      gaps.push({
         index,
         start,
         end,
         shown: Math.min(expansions[index] ?? 0, end - start),
         grows: above ? 'down' : 'up',
         delta: deltaOf(above, below),
-      }
-      gaps.push({ ...gap, shown: Math.max(gap.shown, held(gap, pinned)) })
+      })
     }
   }
   return gaps
@@ -84,23 +78,4 @@ function deltaOf(above: HunkData | undefined, below: HunkData | undefined): numb
     return above.newStart + above.newLines - (above.oldStart + above.oldLines)
   }
   return below ? below.newStart - below.oldStart : 0
-}
-
-/** held is the least a run can be open and still show every commented line inside it. */
-function held(gap: Gap, pinned: readonly Pin[]): number {
-  let shown = 0
-  for (const pin of pinned) {
-    const line = pin.side === 'old' ? pin.line : pin.line - gap.delta
-    if (line < gap.start || line >= gap.end) {
-      continue
-    }
-    shown = Math.max(shown, gap.grows === 'down' ? line - gap.start + 1 : gap.end - line)
-  }
-  return shown
-}
-
-/** Pin is a commented line a run has to keep on screen, on the side its thread is anchored to. */
-export interface Pin {
-  side: 'old' | 'new'
-  line: number
 }

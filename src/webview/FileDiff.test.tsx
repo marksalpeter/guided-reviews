@@ -101,6 +101,41 @@ describe('FileDiff', () => {
     expect(screen.queryByText('line1')).toBeNull()
   })
 
+  it('keeps a run shut even when a comment sits inside it', () => {
+    show(true, [lineThread('old', 12, 'buried')])
+
+    expect(screen.getByText('30 lines unchanged')).toBeTruthy()
+  })
+
+  it('counts the comments a shut run is hiding', () => {
+    show(true, [lineThread('old', 12, 'buried'), lineThread('old', 14, 'also buried')])
+
+    expect(screen.getByText('2 comments')).toBeTruthy()
+  })
+
+  it('lists the threads a shut run is hiding, under its bar', () => {
+    show(true, [lineThread('old', 12, 'buried')])
+
+    expect(screen.getByText('buried')).toBeTruthy()
+  })
+
+  it('quotes the hidden line a listed thread was left on', () => {
+    show(true, [lineThread('old', 12, 'buried')])
+
+    expect(screen.getByText('line 12')).toBeTruthy()
+    expect(screen.getByText('line12')).toBeTruthy()
+  })
+
+  it('grows a listed thread quote to the lines around it, without opening the run', () => {
+    show(true, [lineThread('old', 12, 'buried')])
+
+    fireEvent.click(screen.getByText('show context'))
+
+    expect(screen.getByText('line10')).toBeTruthy()
+    expect(screen.getByText('line14')).toBeTruthy()
+    expect(screen.getByText('30 lines unchanged')).toBeTruthy()
+  })
+
   it('peeks one step of a run, leaving the rest of it marked', () => {
     show()
 
