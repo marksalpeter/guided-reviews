@@ -137,6 +137,8 @@ export class ReviewPanel {
     this.selection = selection
     // a different pair is a different event log, so the guide attempt has to be reconsidered
     this.key = await this.service.openSelection(selection)
+    // the agent CLI has no other way to tell which of several reviews the human is reading
+    await this.service.reviews.markCurrent(this.key)
     this.guideAttempted = false
     this.panel.title = titleFor(selection)
     await this.push()

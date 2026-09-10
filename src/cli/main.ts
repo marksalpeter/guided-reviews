@@ -81,10 +81,10 @@ async function runReply(args: readonly string[], out: Writer): Promise<number> {
     throw new Error('usage: review reply <thread-id> -m <message>')
   }
 
-  const { service, key } = await resolveReview()
+  const { service, key } = await resolveReview(threadId)
   const review = await service.load(key)
   if (!review.state.threads.some(thread => thread.id === threadId)) {
-    throw new Error(`no thread ${threadId} in review ${key}`)
+    throw new Error(`no thread ${threadId} in any review of this repository`)
   }
 
   await service.reply(key, threadId, body, 'agent')
@@ -92,21 +92,32 @@ async function runReply(args: readonly string[], out: Writer): Promise<number> {
   return 0
 }
 
-/** resolveReview finds the review for the current branch, falling back to a head-sha lookup. */
-async function resolveReview(): Promise<{ service: ReviewService; key: string }> {
+/** resolveReview finds the review a command is about: the thread's own, else the one the panel has open. */
+async function resolveReview(threadId = ''): Promise<{ service: ReviewService; key: string }> {
   const root = await repoRoot()
   const git = new Git(root)
   const service = new ReviewService(git)
+  const store = service.reviews
+
+  // a thread names its review exactly, and a branch can hold several reviews at once
+  const byThread = threadId ? await store.findByThread(threadId) : null
+  if (byThread) {
+    return { service, key: byThread }
+  }
+
+  // the panel may be showing a pair the branch's own review knows nothing about
+  const open = await store.current()
+  if (open) {
+    return { service, key: open }
+  }
 
   const branch = await git.currentBranch()
-  const store = service.reviews
   const byBranch = branch ? ReviewStore.keyForBranch(branch) : ''
   if (byBranch && (await store.read(byBranch)).length > 0) {
     return { service, key: byBranch }
   }
 
-  const headSha = await git.revParse('HEAD')
-  const byHead = await store.findByHead(headSha)
+  const byHead = await store.findByHead(await git.revParse('HEAD'))
   if (byHead) {
     return { service, key: byHead }
   }

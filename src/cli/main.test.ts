@@ -18,6 +18,7 @@ class Capture {
 describe('review', () => {
   let dir: string
   let cwd: string
+  let exec: SystemExec
   let service: ReviewService
   let out: Capture
   let err: Capture
@@ -25,7 +26,7 @@ describe('review', () => {
   beforeEach(async () => {
     cwd = process.cwd()
     dir = await mkdtemp(join(tmpdir(), 'gr-cli-'))
-    const exec = new SystemExec(dir)
+    exec = new SystemExec(dir)
     await exec.run('git', ['init', '-q', '-b', 'main'])
     await exec.run('git', ['config', 'user.email', 'test@example.com'])
     await exec.run('git', ['config', 'user.name', 'Test'])
@@ -121,6 +122,47 @@ describe('review', () => {
 
     expect(await main(['reply', 't_missing', '-m', 'hi'], out, err)).toBe(1)
     expect(err.text).toContain('no thread t_missing')
+  })
+
+  it('replies into the review holding the thread, not the branch review beside it', async () => {
+    // the shape that breaks it: a branch review against main, and the stacked pair the human is reading
+    await exec.run('git', ['checkout', '-qb', 'parent', 'main'])
+    await writeFile(join(dir, 'p.ts'), 'parent\n')
+    await exec.run('git', ['add', '-A'])
+    await exec.run('git', ['commit', '-qm', 'parent work'])
+    await exec.run('git', ['checkout', '-q', 'feature'])
+    const branchKey = await service.openBranchReview()
+    const pairKey = await service.openRangeReview('parent', 'feature')
+    const id = await service.startThread(pairKey, 'a.ts', 'new', 4, 'needs a null check')
+
+    expect(await main(['reply', id, '-m', 'fixed it'], out, err)).toBe(0)
+
+    expect((await service.load(pairKey)).state.threads[0]?.comments).toHaveLength(2)
+    expect((await service.load(branchKey)).state.threads).toHaveLength(0)
+  })
+
+  it('lists the review the panel has open, not the one the branch name points at', async () => {
+    const branchKey = await service.openBranchReview()
+    await service.startThread(branchKey, 'a.ts', 'new', 4, 'on the branch review')
+    const pairKey = await service.openRangeReview('main', 'feature')
+    await service.startThread(pairKey, 'a.ts', 'new', 4, 'on the pair the human opened')
+    await service.reviews.markCurrent(pairKey)
+
+    expect(await main(['comments'], out, err)).toBe(0)
+
+    expect(out.text).toContain('on the pair the human opened')
+    expect(out.text).not.toContain('on the branch review')
+  })
+
+  it('falls back to the branch when the review the panel opened has been deleted', async () => {
+    const branchKey = await service.openBranchReview()
+    await service.startThread(branchKey, 'a.ts', 'new', 4, 'on the branch review')
+    const pairKey = await service.openRangeReview('main', 'feature')
+    await service.reviews.markCurrent(pairKey)
+    await service.reviews.delete(pairKey)
+
+    expect(await main(['comments'], out, err)).toBe(0)
+    expect(out.text).toContain('on the branch review')
   })
 
   it('requires a message when replying', async () => {

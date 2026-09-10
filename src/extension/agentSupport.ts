@@ -17,7 +17,7 @@ export const skillRelativePath = `${skillDirRelativePath}/SKILL.md`
 export const claudeSkillRelativePath = '.claude/skills/guided-reviews'
 
 /** skillVersion is bumped whenever the skill's contract changes, forcing a rewrite. */
-export const skillVersion = 4
+export const skillVersion = 5
 
 /** installAgentSupport writes the shim and skill, and hides the skill from git for this clone only. */
 export async function installAgentSupport(options: InstallOptions): Promise<void> {
@@ -114,8 +114,10 @@ threads are **not** in git and **not** greppable — read them through the CLI.
 ${shimRelativePath} comments
 \`\`\`
 
-Prints every **unresolved** thread for the current branch's review: file path,
-line number, the quoted code, the whole conversation, and a thread id.
+Prints every **unresolved** thread of the review the panel has open: file path,
+line number, the quoted code, the whole conversation, and a thread id. It prints
+the pair that review covers — a branch is not always compared against the
+default branch, so do not assume the range.
 
 - \`--unanswered\` limits it to threads you have not replied to since the human
   last spoke. Use this on a second pass.
@@ -140,7 +142,12 @@ ${shimRelativePath} reply <thread-id> -m "handled the null case in abc123"
 \`\`\`
 
 Reply after you have made the change, and say what you changed. The human sees
-your reply appear live in the review panel.
+your reply appear live in the review panel. A thread id names its own review, so
+a reply lands even when the human is reading a pair other than this branch's.
+
+Rewriting the commit you were reviewed on — an amend or a rebase — leaves the
+open review pointing at the commit that is gone. Reply first, then rewrite, or
+tell the human to reopen the panel.
 
 ## Linking the human to a comment
 

@@ -14,6 +14,9 @@ const lockRetryMs = 5
 /** lockTimeoutMs bounds a stuck lock so a crashed writer cannot wedge the store. */
 const lockTimeoutMs = 5000
 
+/** currentFile names the review the panel has open, which is not always the branch's own. */
+const currentFile = 'current'
+
 /** ReviewStore is the append-only JSONL event log backing every review. */
 export class ReviewStore {
   private root: string
@@ -90,6 +93,32 @@ export class ReviewStore {
     }
   }
 
+  /** markCurrent records which review the panel is showing, so an agent reads the one the human is reading. */
+  async markCurrent(key: string): Promise<void> {
+    await this.ensureStoreDir()
+    await writeFile(join(this.dir, currentFile), `${key}\n`)
+  }
+
+  /** current is the review the panel last opened, or null when it names one that no longer exists. */
+  async current(): Promise<string | null> {
+    const key = (await this.readFileOr(join(this.dir, currentFile)))?.trim()
+    if (!key) {
+      return null
+    }
+    return (await this.read(key)).length > 0 ? key : null
+  }
+
+  /** findByThread returns the review holding a thread, since an agent names the thread and not the review. */
+  async findByThread(threadId: string): Promise<string | null> {
+    for (const key of await this.list()) {
+      const state = await this.load(key)
+      if (state.threads.some(thread => thread.id === threadId)) {
+        return key
+      }
+    }
+    return null
+  }
+
   /** findByHead returns the review key whose head is the given sha, for agent lookups. */
   async findByHead(headSha: string): Promise<string | null> {
     for (const key of await this.list()) {
@@ -108,8 +137,13 @@ export class ReviewStore {
 
   /** readRaw reads a log file, returning null when the review does not exist. */
   private async readRaw(key: string): Promise<string | null> {
+    return this.readFileOr(this.pathFor(key))
+  }
+
+  /** readFileOr reads a file in the store, returning null when it is not there. */
+  private async readFileOr(path: string): Promise<string | null> {
     try {
-      return await readFile(this.pathFor(key), 'utf8')
+      return await readFile(path, 'utf8')
     } catch {
       return null
     }
