@@ -675,7 +675,6 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 }
 
 .gr-comment { display: flex; align-items: flex-start; gap: 9px; padding: 21px 0; line-height: 1.5; }
-.gr-comments .gr-comment:first-child { padding-top: 0; }
 .gr-comment + .gr-comment { border-top: 1px solid var(--vscode-panel-border); }
 .gr-comment-body { flex: 1; min-width: 0; white-space: pre-wrap; }
 .gr-comment-mark { flex: none; width: 6px; align-self: stretch; padding-top: 6px; }
