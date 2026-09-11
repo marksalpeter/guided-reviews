@@ -7,6 +7,8 @@
   --gr-summary-width: 300px;
   /* the page's side gutter, kept as a name because the content and the pill share it */
   --gr-gutter: 18px;
+  /* the height a file's title bar holds, which is also what a fold handle pins beneath */
+  --gr-file-header-h: 32px;
 
   /* positional commit colours: after the fork is blue, before it orange */
   --gr-after: var(--vscode-textLink-foreground, #4daafc);
@@ -347,17 +349,26 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .gr-filecard.reviewed { opacity: 0.55; }
 .gr-filecard.reviewed:hover { opacity: 1; }
 .gr-filecard-icon { flex: 0 0 auto; color: var(--vscode-descriptionForeground); }
-/* the whole path, cut from the head so the name it ends with is the part that survives */
-.gr-filecard-path {
+/* the name is what the card is for, so the directory gives up the whole width before the
+   name gives up a character — a shrink factor apart, not a rule apart */
+.gr-filecard-name {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.gr-filecard-dir {
+  flex: 0 9999 auto;
+  min-width: 0;
+  color: var(--vscode-descriptionForeground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* cut from the head: the directory nearest the file says more than the repository root */
   direction: rtl;
   text-align: left;
 }
-.gr-filecard-dir { color: var(--vscode-descriptionForeground); }
 
 /* ── floating guide pill ───────────────────────────────────────────────── */
 
@@ -451,10 +462,18 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .gr-file.reviewed { opacity: 0.6; }
 .gr-file.reviewed:hover { opacity: 1; }
 
+/* the title bar holds the top of its file, so the reader always knows what they are looking
+   at; one fixed height, because the fold handles below it pin at exactly its lower edge */
 .gr-file-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
   display: flex;
   align-items: center;
   gap: 10px;
+  /* border-box, so the height the fold handles offset by is the whole bar and not its text */
+  box-sizing: border-box;
+  min-height: var(--gr-file-header-h);
   padding: 6px 10px;
   background: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background));
   border-bottom: 1px solid var(--vscode-panel-border);
@@ -469,6 +488,13 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
+}
+
+/* one column already has the chapter summary holding the top in a band of its own, and two
+   stacked bars would eat the panel, so the title bar stands down. The handles keep pinning
+   under that band — see the rule beside the fold, which measures it. */
+@media (max-width: 900px) {
+  .gr-file-header { position: static; }
 }
 
 .gr-file-header > .gr-file-toggle,
@@ -578,7 +604,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 /* the handle holds the top of the pane while the run's lines are on screen, so the way back
    is always one click away; the mark is a boundary rather than a control, and stays put */
-.gr-fold-handle { position: sticky; top: 0; z-index: 3; }
+.gr-fold-handle { position: sticky; top: var(--gr-file-header-h); z-index: 3; }
 
 .gr-fold .diff { border-top: 1px solid var(--vscode-panel-border); }
 .gr-fold-mark + .gr-fold-handle,

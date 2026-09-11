@@ -24,10 +24,8 @@ export const FileList = ({
           onClick={() => onSelect(path)}
         >
           <FileGlyph />
-          <span className="gr-filecard-path">
-            {dir && <span className="gr-filecard-dir">{dir}/</span>}
-            <span className="gr-filecard-name">{basename(path)}</span>
-          </span>
+          <span className="gr-filecard-name">{basename(path)}</span>
+          {dir && <span className="gr-filecard-dir">{dir}</span>}
           <span className="gr-spacer" />
           {meta && meta.additions > 0 && <span className="gr-stat-add">+{meta.additions}</span>}
           {meta && meta.deletions > 0 && <span className="gr-stat-del">−{meta.deletions}</span>}
