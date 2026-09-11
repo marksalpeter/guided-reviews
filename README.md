@@ -53,10 +53,10 @@ never shown to it again. Comment on a resolved thread to reopen it.
 
 ```sh
 npm install
-npm run build
-npx @vscode/vsce package
-code --install-extension guided-reviews-0.1.0.vsix
+npm run dev:install      # builds, packages, and installs the VSIX with --force
 ```
+
+Run **Developer: Reload Window** afterwards so the editor picks up the new build.
 
 The guided review shells out to the `claude` CLI. Point `guidedReviews.claudePath` at it
 if it is not on your `PATH`. Everything else works without it — a failed or missing

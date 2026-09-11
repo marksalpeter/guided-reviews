@@ -42,13 +42,12 @@ actually runs.
 The editor runs the installed copy, so `npm run build` alone changes nothing they can see.
 
 ```sh
-npm run package                                       # builds, then writes guided-reviews-<version>.vsix
-code --install-extension guided-reviews-<version>.vsix --force
+npm run dev:install                                   # builds, packages, installs the VSIX
 ```
 
-`npm run package` runs the build itself, so there is no separate build step. `--force` is
-required: the version rarely changes between installs, and without it VS Code skips an
-install it reads as already present.
+`dev:install` runs `package` (which builds) and then installs the resulting VSIX with
+`--force`. The `--force` is required: the version rarely changes between installs, and
+without it VS Code skips an install it reads as already present.
 
 Finish by telling the user to run **Developer: Reload Window** and reopen the panel. No
 agent can trigger that from the shell — the extension host holds the old copy until the

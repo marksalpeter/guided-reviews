@@ -107,6 +107,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "package": "npm run build && vsce package --no-rewrite-relative-links",
+    "dev:install": "npm run package && code --install-extension guided-reviews-$npm_package_version.vsix --force",
     "vscode:prepublish": "npm run build"
   },
   "devDependencies": {
