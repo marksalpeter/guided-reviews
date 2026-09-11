@@ -17,7 +17,7 @@ export const skillRelativePath = `${skillDirRelativePath}/SKILL.md`
 export const claudeSkillRelativePath = '.claude/skills/guided-reviews'
 
 /** skillVersion is bumped whenever the skill's contract changes, forcing a rewrite. */
-export const skillVersion = 5
+export const skillVersion = 6
 
 /** installAgentSupport writes the shim and skill, and hides the skill from git for this clone only. */
 export async function installAgentSupport(options: InstallOptions): Promise<void> {
@@ -145,9 +145,8 @@ Reply after you have made the change, and say what you changed. The human sees
 your reply appear live in the review panel. A thread id names its own review, so
 a reply lands even when the human is reading a pair other than this branch's.
 
-Rewriting the commit you were reviewed on — an amend or a rebase — leaves the
-open review pointing at the commit that is gone. Reply first, then rewrite, or
-tell the human to reopen the panel.
+Commit before you reply. A branch review follows its branch, so your commit is
+what the human sees the reply against.
 
 ## Linking the human to a comment
 

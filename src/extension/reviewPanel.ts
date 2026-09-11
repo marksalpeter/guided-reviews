@@ -4,6 +4,7 @@ import { ClaudeCli } from '../core/guide.js'
 import { stat } from 'node:fs/promises'
 import type { HostMessage, ReviewPayload, SelectorState, ViewMessage } from '../core/protocol.js'
 import { ReviewService, type Selection } from '../core/review.js'
+import { ReviewStore } from '../core/store.js'
 
 /** viewType identifies the panel for VS Code's tab restore. */
 export const viewType = 'guidedReviews.review'
@@ -74,6 +75,7 @@ export class ReviewPanel {
   /** push sends the current selection and, once one exists, the review it resolves to. */
   async push(): Promise<void> {
     try {
+      await this.followBranch()
       // read the size first, so an append that lands mid-push still looks new to the watcher
       const size = await this.logSize()
       const selector = await this.selector()
@@ -92,6 +94,21 @@ export class ReviewPanel {
     } catch (error) {
       this.send({ type: 'error', message: messageOf(error) })
     }
+  }
+
+  /** followBranch carries a branch review onto a new commit, which the log itself never records. */
+  private async followBranch(): Promise<void> {
+    if (this.key !== ReviewStore.keyForBranch(this.selection.branch)) {
+      // a pair picked by commit is frozen where the reader put it
+      return
+    }
+    const tip = await this.tipOf(this.selection.branch)
+    if (!tip || tip === this.selection.headSha) {
+      return
+    }
+    this.selection = await this.service.selectionAgainst(this.selection.branch, this.selection.baseBranch)
+    this.key = await this.service.openSelection(this.selection)
+    await this.service.reviews.markCurrent(this.key)
   }
 
   /** focus reveals one comment, bringing the panel forward so a deep link lands on the thread. */

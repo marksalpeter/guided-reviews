@@ -116,6 +116,17 @@ describe('foldReview', () => {
     expect(moved.guide?.groups).toHaveLength(1)
   })
 
+  it('moves the base, and stales a guide written for the old one', () => {
+    const guide: ReviewEvent = { t: 'guide.generated', baseSha: 'base1', headSha: 'head1', groups: [], at: 'a' }
+    const moved = foldReview([created, guide, { t: 'review.base_moved', baseSha: 'base2', baseLabel: 'parent', at: 'b' }])
+
+    expect(moved.refs.baseSha).toBe('base2')
+    expect(moved.refs.baseLabel).toBe('parent')
+    // the head never moved, so only the base can be telling it the guide no longer fits
+    expect(moved.refs.headSha).toBe('head1')
+    expect(moved.guideStale).toBe(true)
+  })
+
   it('records the last guide failure and clears it on success', () => {
     const failed = foldReview([created, { t: 'guide.failed', message: 'boom', at: 'a' }])
     expect(failed.guideError).toBe('boom')

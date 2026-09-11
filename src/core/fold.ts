@@ -51,6 +51,10 @@ function applyEvent(state: ReviewState, threads: Map<string, Thread>, event: Rev
         headLabel: event.headLabel,
       }
       return
+    case 'review.base_moved':
+      state.refs.baseSha = event.baseSha
+      state.refs.baseLabel = event.baseLabel
+      return
     case 'review.head_moved':
       state.refs.headSha = event.headSha
       state.refs.headLabel = event.headLabel
@@ -128,7 +132,10 @@ function lastComment(thread: Thread): Comment | undefined {
 
 /** isGuideStale reports whether head has moved past the commit the guide describes. */
 function isGuideStale(state: ReviewState): boolean {
-  return state.guide !== undefined && state.guide.headSha !== state.refs.headSha
+  if (state.guide === undefined) {
+    return false
+  }
+  return state.guide.headSha !== state.refs.headSha || state.guide.baseSha !== state.refs.baseSha
 }
 
 export const __test = { isGuideStale, lastComment }

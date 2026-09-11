@@ -360,4 +360,114 @@ describe('ReviewService', () => {
 
     expect((await service.load(key)).state.reviewedBlobs).toEqual({})
   })
+
+  describe('a base branch that moves', () => {
+    /** stack builds main → parent → child, the shape a stacked pull request has. */
+    const stack = async () => {
+      await exec.run('git', ['checkout', '-qb', 'parent', 'main'])
+      await writeFile(join(dir, 'p.ts'), 'export const parent = 1\n')
+      await commit('parent work')
+      await exec.run('git', ['checkout', '-qb', 'child'])
+      await writeFile(join(dir, 'c.ts'), 'export const child = 1\n')
+      await commit('child work')
+    }
+
+    const onParent = () => service.selectionAgainst('child', 'parent')
+
+    it('keeps the branch review when the base changes, so its threads outlive the choice', async () => {
+      await stack()
+      const first = await service.openSelection(await service.defaultSelection())
+      await service.startThread(first, 'c.ts', 'new', 1, 'why this name?')
+
+      const second = await service.openSelection(await onParent())
+
+      expect(second).toBe(first)
+      const { state, files } = await service.load(second)
+      expect(state.refs.baseSha).toBe(await service.repo.revParse('parent'))
+      expect(state.refs.baseLabel).toBe('parent')
+      expect(files.map(file => file.path)).toEqual(['c.ts'])
+      expect(state.threads).toHaveLength(1)
+    })
+
+    it('advances the head after an amend instead of stranding the review on a commit that is gone', async () => {
+      await stack()
+      const key = await service.openSelection(await onParent())
+      await service.startThread(key, 'c.ts', 'new', 1, 'rename this')
+      await writeFile(join(dir, 'c.ts'), 'export const renamed = 1\n')
+      await exec.run('git', ['add', '-A'])
+      await exec.run('git', ['commit', '-q', '--amend', '--no-edit'])
+
+      const again = await service.openSelection(await onParent())
+
+      expect(again).toBe(key)
+      const { state } = await service.load(again)
+      expect(state.refs.headSha).toBe(await service.repo.revParse('child'))
+      expect(state.threads).toHaveLength(1)
+    })
+
+    it('follows the base branch when it moves under the review', async () => {
+      await stack()
+      const key = await service.openSelection(await onParent())
+      await exec.run('git', ['checkout', '-q', 'parent'])
+      await writeFile(join(dir, 'p2.ts'), 'export const more = 1\n')
+      await commit('more parent work')
+      await exec.run('git', ['checkout', '-q', 'child'])
+      await exec.run('git', ['merge', '-q', '--no-edit', 'parent'])
+
+      await service.openSelection(await onParent())
+
+      const { state, files } = await service.load(key)
+      expect(state.refs.baseSha).toBe(await service.repo.revParse('parent'))
+      // the parent's own work is behind the base now, so it is no longer this review's to show
+      expect(files.map(file => file.path)).toEqual(['c.ts'])
+    })
+
+    it('opens the panel back on the base that was chosen', async () => {
+      await stack()
+      await service.openSelection(await onParent())
+
+      expect((await service.defaultSelection()).baseBranch).toBe('parent')
+    })
+
+    it('falls back to the default branch once the chosen base is deleted', async () => {
+      await stack()
+      await service.openSelection(await onParent())
+      await exec.run('git', ['branch', '-qD', 'parent'])
+
+      expect((await service.defaultSelection()).baseBranch).toBe('main')
+    })
+
+    it('re-pins an old-side thread when the base moves the line it was left on', async () => {
+      await exec.run('git', ['checkout', '-qb', 'parent', 'main'])
+      await writeFile(join(dir, 'p.ts'), 'export const parent = 1\n')
+      await commit('parent work')
+      await exec.run('git', ['checkout', '-qb', 'child'])
+      await writeLines(['one', 'CHANGED', 'three'])
+      await commit('child edits the second line')
+      const key = await service.openSelection(await onParent())
+      // the base's own copy of the line, which is what an old-side anchor is pinned to
+      const id = await service.startThread(key, 'a.ts', 'old', 2, 'was this always here?')
+
+      // the parent grows a line above it, and the child takes that in
+      await exec.run('git', ['checkout', '-q', 'parent'])
+      await writeLines(['zero', 'one', 'two', 'three'])
+      await commit('parent prepends a line')
+      await exec.run('git', ['checkout', '-q', 'child'])
+      await exec.run('git', ['merge', '-q', '--no-edit', 'parent'])
+      await service.openSelection(await onParent())
+
+      const thread = (await service.load(key)).state.threads.find(candidate => candidate.id === id)
+      expect(thread?.status).toBe('relocated')
+      expect(thread?.resolvedLine).toBe(3)
+    })
+
+    it('still freezes a pair picked by commit rather than by branch', async () => {
+      await stack()
+      const selection = await service.defaultSelection()
+
+      const key = await service.openSelection({ ...selection, baseSha: await service.repo.revParse('child') })
+
+      expect(key).toContain('..')
+    })
+  })
 })

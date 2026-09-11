@@ -128,6 +128,18 @@ export class Git {
     return this.git(['cat-file', 'blob', blob])
   }
 
+  /** hasRef reports whether a revision still resolves, since a chosen base branch can later be deleted. */
+  async hasRef(rev: string): Promise<boolean> {
+    return (await this.tryGit(['rev-parse', '--verify', '--quiet', `${rev}^{commit}`])) !== null
+  }
+
+  /** baseBranchName is the default branch under the name the picker lists it by, or the remote ref when no local branch carries it. */
+  async baseBranchName(): Promise<string> {
+    const full = await this.defaultBranch()
+    const local = full.replace(/^[^/]+\//, '')
+    return (await this.hasRef(local)) ? local : full
+  }
+
   /** defaultBranchName is the default branch without its remote prefix, for display and fork labels. */
   async defaultBranchName(): Promise<string> {
     const full = await this.defaultBranch()

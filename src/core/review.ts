@@ -6,7 +6,7 @@ import { Git } from './git.js'
 import { GuideGenerator, type ClaudeRunner } from './guide.js'
 import type { SelectorState } from './protocol.js'
 import { ReviewStore } from './store.js'
-import type { Anchor, ChangedFile, LineAnchor, ReviewState, Thread } from './types.js'
+import type { Anchor, ChangedFile, LineAnchor, ReviewRefs, ReviewState, Thread } from './types.js'
 
 /** commitPickerLimit is how many recent commits the two-commit picker offers. */
 export const commitPickerLimit = 50
@@ -31,20 +31,22 @@ export class ReviewService {
     return this.store
   }
 
-  /** openBranchReview creates or advances the review for the current branch. */
-  async openBranchReview(): Promise<string> {
+  /** openBranchReview creates or advances the review for the current branch, against the base it is read on. */
+  async openBranchReview(baseBranch = ''): Promise<string> {
     const branch = await this.git.currentBranch()
     const headSha = await this.git.revParse('HEAD')
+    const headLabel = branch || headSha.slice(0, 12)
     const key = branch ? ReviewStore.keyForBranch(branch) : ReviewStore.keyForRange('detached', headSha)
 
     const existing = await this.store.load(key)
+    const baseLabel = baseBranch || (await this.baseBranchFor(branch || 'HEAD'))
+    const baseSha = await this.openingBase(branch || 'HEAD', baseLabel, headSha)
+
     if (existing.refs.baseSha) {
-      await this.advanceHead(key, existing, headSha, branch || headSha.slice(0, 12))
+      await this.advanceRefs(key, existing, { baseSha, baseLabel, headSha, headLabel })
       return key
     }
 
-    const defaultBranch = await this.git.defaultBranch()
-    const baseSha = await this.git.mergeBase(defaultBranch, 'HEAD')
     await this.store.append(key, {
       t: 'review.created',
       v: schemaVersion,
@@ -53,17 +55,17 @@ export class ReviewService {
       ...(branch ? { branch } : {}),
       baseSha,
       headSha,
-      baseLabel: defaultBranch,
-      headLabel: branch || headSha.slice(0, 12),
+      baseLabel,
+      headLabel,
       at: now(),
     })
     return key
   }
 
-  /** defaultSelection is where the panel opens: the branch's head against the commit it forked from. */
+  /** defaultSelection is where the panel opens: the branch's head against the base it was last read on. */
   async defaultSelection(): Promise<Selection> {
     const branch = (await this.git.currentBranch()) || 'HEAD'
-    return this.selectionAgainst(branch, await this.git.defaultBranchName())
+    return this.selectionAgainst(branch, await this.baseBranchFor(branch))
   }
 
   /** selectionAgainst brackets a branch by its merge base with another branch, up to its head. */
@@ -76,7 +78,7 @@ export class ReviewService {
   async openSelection(selection: Selection): Promise<string> {
     const canonical = await this.isCanonical(selection)
     if (canonical) {
-      return this.openBranchReview()
+      return this.openBranchReview(selection.baseBranch)
     }
     return this.openRangeReview(selection.baseSha, selection.headSha)
   }
@@ -228,8 +230,8 @@ export class ReviewService {
     if (selection.branch !== (await this.git.currentBranch())) {
       return false
     }
-    // the branch review is the one against the default branch, so any other base is an ad-hoc pair
-    if (selection.baseBranch !== (await this.git.defaultBranchName())) {
+    // a branch against itself is a walk back through its own commits, each pair frozen where it was picked
+    if (selection.branch === selection.baseBranch) {
       return false
     }
     const [head, fork] = await Promise.all([
@@ -237,6 +239,15 @@ export class ReviewService {
       this.git.mergeBase(selection.baseBranch, selection.branch),
     ])
     return selection.headSha === head && selection.baseSha === fork
+  }
+
+  /** baseBranchFor is the base a branch was last read against, falling back once that branch is gone. */
+  private async baseBranchFor(branch: string): Promise<string> {
+    const chosen = (await this.store.load(ReviewStore.keyForBranch(branch))).refs.baseLabel
+    if (chosen && (await this.git.hasRef(chosen))) {
+      return chosen
+    }
+    return this.git.baseBranchName()
   }
 
   /** appendThread writes the open event and its first comment. */
@@ -252,12 +263,14 @@ export class ReviewService {
     return id
   }
 
-  /** advanceHead records a new head commit when the branch has moved on. */
-  private async advanceHead(key: string, state: ReviewState, headSha: string, headLabel: string): Promise<void> {
-    if (state.refs.headSha === headSha) {
-      return
+  /** advanceRefs records whichever end of the review has moved since it was last opened. */
+  private async advanceRefs(key: string, state: ReviewState, refs: ReviewRefs): Promise<void> {
+    if (state.refs.baseSha !== refs.baseSha || state.refs.baseLabel !== refs.baseLabel) {
+      await this.store.append(key, { t: 'review.base_moved', baseSha: refs.baseSha, baseLabel: refs.baseLabel, at: now() })
     }
-    await this.store.append(key, { t: 'review.head_moved', headSha, headLabel, at: now() })
+    if (state.refs.headSha !== refs.headSha) {
+      await this.store.append(key, { t: 'review.head_moved', headSha: refs.headSha, headLabel: refs.headLabel, at: now() })
+    }
   }
 
   /** relocateThreads re-pins every line anchor against the blobs in the current diff. */

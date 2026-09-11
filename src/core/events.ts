@@ -6,6 +6,7 @@ export const schemaVersion = 1
 /** ReviewEvent is one appended record in a review's log. */
 export type ReviewEvent =
   | ReviewCreated
+  | BaseMoved
   | HeadMoved
   | ThreadOpened
   | CommentAdded
@@ -48,6 +49,7 @@ function isReviewEvent(value: unknown): value is ReviewEvent {
 /** knownTypes is every event tag the fold understands. */
 const knownTypes = new Set([
   'review.created',
+  'review.base_moved',
   'review.head_moved',
   'thread.opened',
   'comment.added',
@@ -60,7 +62,7 @@ const knownTypes = new Set([
   'file.unreviewed',
 ])
 
-/** ReviewCreated opens a review and pins its base. */
+/** ReviewCreated opens a review on its first commit pair. */
 export interface ReviewCreated {
   t: 'review.created'
   v: number
@@ -71,6 +73,14 @@ export interface ReviewCreated {
   headSha: string
   baseLabel: string
   headLabel: string
+  at: string
+}
+
+/** BaseMoved records the review's base moving, as a merge base does whenever either branch does. */
+export interface BaseMoved {
+  t: 'review.base_moved'
+  baseSha: string
+  baseLabel: string
   at: string
 }
 
