@@ -439,25 +439,17 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 /* no overflow clip: it would make the card the scrollport a fold's handle measures against,
    and the handle would never pin. The corners are rounded on the ends instead. */
+/* the card clips its own corners, so everything inside it can be a plain rectangle — which
+   the title bar has to be, or the diff shows through the two wedges it leaves while stuck */
 .gr-file {
   margin: 18px 0;
   border: 1px solid var(--vscode-panel-border);
   border-radius: var(--gr-card-radius);
-}
-
-/* the corner has to be clipped, not just declared: the tint of a changed line and the ground
-   of a fold bar are painted by descendants, which a radius on their container does not round */
-.gr-file > *:last-child,
-.gr-diff > *:last-child {
-  border-radius: 0 0 calc(var(--gr-card-radius) - 1px) calc(var(--gr-card-radius) - 1px);
   overflow: clip;
 }
 
-/* a shut file is header alone, so it rounds at both ends and keeps no rule under it */
-.gr-file > .gr-file-header:last-child {
-  border-radius: calc(var(--gr-card-radius) - 1px);
-  border-bottom: none;
-}
+/* a shut file is header alone, so it keeps no rule under it */
+.gr-file > .gr-file-header:last-child { border-bottom: none; }
 
 .gr-file.reviewed { opacity: 0.6; }
 .gr-file.reviewed:hover { opacity: 1; }
@@ -477,7 +469,6 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   padding: 6px 10px;
   background: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background));
   border-bottom: 1px solid var(--vscode-panel-border);
-  border-radius: calc(var(--gr-card-radius) - 1px) calc(var(--gr-card-radius) - 1px) 0 0;
   font-family: var(--vscode-editor-font-family);
   font-size: 0.92em;
 }
