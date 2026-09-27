@@ -30,6 +30,24 @@ behind. A run holding a comment thread stays open far enough to show it.
 
 ![A run opened between two hunks: the handle above the borrowed lines, and the mark counting the four it still holds back](media/screenshot-expand.png)
 
+## How to follow the code
+
+**Hold ⌘ (Ctrl on Linux and Windows) and point at a name.** The language server is asked about
+it the way the editor asks, and the name underlines when it leads somewhere. Click it and its
+definition opens beside the review, the name selected, without the review losing focus.
+
+**Point at a declaration to see its callers.** The list groups them by file; click one and its
+call site opens in that same side pane, while the list stays up for the next.
+
+![⌘ held over a declaration: its name underlined, and its callers listed beneath it](media/screenshot-links.png)
+
+**The answers are for the commit you are reading.** When your working tree already holds it,
+they come from your own files. When it does not — other commits checked out, edits not yet
+committed — the extension checks the commit out beside the repository, under
+`.git/guided-reviews`, and asks about that copy, so a line never lands on what has changed
+since. Those files open read-only: the first time one is needed, `files.readonlyInclude`
+gains `**/.git/guided-reviews/**` in your user settings.
+
 ## How to send feedback to agents
 
 **Leave comments on the lines they belong to.** Click a line number, write the comment.

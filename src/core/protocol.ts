@@ -30,6 +30,8 @@ export type HostMessage =
   | { type: 'review'; payload: ReviewPayload }
   | { type: 'source'; blob: string; text: string }
   | { type: 'error'; message: string }
+  | { type: 'lookup'; id: number; lookup: Lookup }
+  | { type: 'references'; id: number; references: Reference[] }
 
 /** ViewMessage is sent from the webview to the extension host. */
 export type ViewMessage =
@@ -49,3 +51,35 @@ export type ViewMessage =
   | { type: 'generateGuide' }
   | { type: 'loadSource'; blob: string }
   | { type: 'openFile'; path: string; line: number }
+  | { type: 'lookup'; id: number; path: string; line: number; character: number }
+  | { type: 'references'; id: number; path: string; line: number; character: number }
+  | { type: 'openLocation'; location: CodeLocation }
+
+/** Lookup is what the language server knows about the symbol under the pointer, on the new side of the diff. */
+export type Lookup =
+  | { kind: 'none' }
+  | { kind: 'definition'; range: ColumnRange; target: CodeLocation }
+  | { kind: 'declaration'; range: ColumnRange }
+
+/** ColumnRange is a span of one line, in zero-based columns, end exclusive. */
+export interface ColumnRange {
+  start: number
+  end: number
+}
+
+/** CodeLocation is a place the language server pointed at; the webview only hands it back to be opened. */
+export interface CodeLocation {
+  uri: string
+  line: number
+  character: number
+  endLine: number
+  endCharacter: number
+}
+
+/** Reference is one use of a declaration, labelled for the list of callers. */
+export interface Reference {
+  location: CodeLocation
+  path: string
+  line: number
+  text: string
+}

@@ -8,6 +8,7 @@ import {
   tokenize,
   type ChangeData,
   type DiffType,
+  type EventMap,
   type FileData,
   type GutterOptions,
   type HunkData,
@@ -16,9 +17,11 @@ import {
 } from 'react-diff-view'
 import type { ChangedFile, Thread } from '../core/types.js'
 import { Caret } from './Caret.js'
+import { useCodeLinks } from './CodeLinks.js'
 import { CommentThread, NewCommentBox, type Quote } from './CommentThread.js'
 import { borrowedHunk, expandStep, gapsOf, gutterDigits, hiddenIn, sizeOf, type Expansions, type Gap } from './expand.js'
 import { languageForPath, plaintext, type HastNode, type RefractorLike } from './highlight.js'
+import { Progress } from './Progress.js'
 import { classNameOf, markClassName, styleOf } from './tokens.js'
 import { post } from './vscodeApi.js'
 
@@ -59,9 +62,10 @@ export const FileDiff = ({
   const tokens = useTokens(file, hunks, refractor)
   const highlight = useHighlighter(file, refractor)
   const widgets = useWidgets(file, hunks, threads, pending, setPending)
+  const links = useCodeLinks(pathOf(file))
 
   const table = (hunk: HunkData) => (
-    <DiffTable file={file} hunk={hunk} tokens={tokens} widgets={widgets} onPick={setPending} />
+    <DiffTable file={file} hunk={hunk} tokens={tokens} widgets={widgets} codeEvents={links.events} onPick={setPending} />
   )
   const foldAt = (index: number) => {
     const gap = gaps.find(candidate => candidate.index === index)
@@ -105,6 +109,7 @@ export const FileDiff = ({
           <input type="checkbox" checked={reviewed} onChange={onToggleReviewed} />
           Reviewed
         </label>
+        {links.waiting && <Progress label="Finding definition" />}
       </header>
 
       {!hidden &&
@@ -221,12 +226,14 @@ const DiffTable = ({
   hunk,
   tokens,
   widgets,
+  codeEvents,
   onPick,
 }: {
   file: FileData
   hunk: HunkData
   tokens: HunkTokens | undefined
   widgets: Record<string, ReactNode>
+  codeEvents: EventMap
   onPick: (pending: PendingComment) => void
 }) => (
   <Diff
@@ -237,6 +244,7 @@ const DiffTable = ({
     widgets={widgets}
     renderToken={renderToken}
     renderGutter={renderGutter}
+    codeEvents={codeEvents}
     gutterEvents={{
       onClick: ({ change }) => {
         if (change) {

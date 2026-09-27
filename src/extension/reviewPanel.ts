@@ -4,7 +4,9 @@ import { ClaudeCli } from '../core/guide.js'
 import { stat } from 'node:fs/promises'
 import type { HostMessage, ReviewPayload, SelectorState, ViewMessage } from '../core/protocol.js'
 import { ReviewService, type Selection } from '../core/review.js'
+import { Snapshots } from '../core/snapshot.js'
 import { ReviewStore } from '../core/store.js'
+import { Navigator } from './navigator.js'
 
 /** viewType identifies the panel for VS Code's tab restore. */
 export const viewType = 'guidedReviews.review'
@@ -24,18 +26,21 @@ export class ReviewPanel {
   private selectorCache: { for: string; state: SelectorState } | undefined
   private lastLogSize = -1
   private focusThread: string | undefined
+  private navigator: Navigator
+  private headSha = ''
 
   private constructor(panel: vscode.WebviewPanel, service: ReviewService, selection: Selection, root: vscode.Uri) {
     this.panel = panel
     this.service = service
     this.selection = selection
     this.root = root
+    this.navigator = new Navigator(new Snapshots(service.repo), service.repo.repoRoot)
 
     this.panel.iconPath = tabIcon(root)
     this.panel.webview.options = { enableScripts: true, localResourceRoots: [assetsIn(root)] }
     this.panel.webview.html = this.html()
     this.disposables.push(this.panel.webview.onDidReceiveMessage((m: ViewMessage) => void this.onMessage(m)))
-    this.disposables.push(this.watchStore())
+    this.disposables.push(this.watchStore(), this.navigator)
     this.panel.onDidDispose(() => this.dispose())
   }
 
@@ -81,6 +86,10 @@ export class ReviewPanel {
       const selector = await this.selector()
       const { state, files } = await this.service.load(this.key)
       const diff = await this.service.repo.unifiedDiff(state.refs.baseSha, state.refs.headSha)
+      if (state.refs.headSha !== this.headSha) {
+        this.headSha = state.refs.headSha
+        this.navigator.prepare(this.headSha)
+      }
       const payload: ReviewPayload = {
         review: { state, files, diff },
         selector,
@@ -212,6 +221,12 @@ export class ReviewPanel {
           return await this.sendSource(message.blob)
         case 'openFile':
           return await this.openFile(message.path, message.line)
+        case 'lookup':
+          return await this.lookup(message.id, message.path, message.line, message.character)
+        case 'references':
+          return await this.references(message.id, message.path, message.line, message.character)
+        case 'openLocation':
+          return await this.navigator.open(message.location)
       }
       await this.push()
     } catch (error) {
@@ -275,6 +290,24 @@ export class ReviewPanel {
     const editor = await vscode.window.showTextDocument(uri, { preview: true })
     const position = new vscode.Position(Math.max(0, line - 1), 0)
     editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter)
+  }
+
+  /** lookup answers a ⌘-hover; a server that fails is no different from one that found nothing. */
+  private async lookup(id: number, path: string, line: number, character: number): Promise<void> {
+    try {
+      this.send({ type: 'lookup', id, lookup: await this.navigator.lookup(this.headSha, path, line, character) })
+    } catch {
+      this.send({ type: 'lookup', id, lookup: { kind: 'none' } })
+    }
+  }
+
+  /** references answers the callers tooltip, empty when the server cannot say. */
+  private async references(id: number, path: string, line: number, character: number): Promise<void> {
+    try {
+      this.send({ type: 'references', id, references: await this.navigator.references(this.headSha, path, line, character) })
+    } catch {
+      this.send({ type: 'references', id, references: [] })
+    }
   }
 
   /** watchStore reloads the panel whenever the agent or another window appends to the log. */

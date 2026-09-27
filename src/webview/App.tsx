@@ -4,12 +4,14 @@ import { orderPaths } from '../core/ordering.js'
 import type { HostMessage, LoadedDiff, ReviewPayload } from '../core/protocol.js'
 import type { Guide, GuideGroup, Thread } from '../core/types.js'
 import { BranchBar } from './BranchBar.js'
+import { CodeLinksProvider } from './CodeLinks.js'
 import { CommentThread, threadElementId } from './CommentThread.js'
 import { sourceLines } from './expand.js'
 import { FileDiff, fileAnchorId, pathOf } from './FileDiff.js'
 import { FileList, isReviewed, reviewedCount } from './FileList.js'
 import { GuideStatus } from './GuideStatus.js'
 import { activeTheme, loadRefractor, type RefractorLike } from './highlight.js'
+import { Progress } from './Progress.js'
 import { loadViewState, post, saveViewState } from './vscodeApi.js'
 
 /** withPath adds or drops one path from a set, leaving the set it was given alone. */
@@ -67,7 +69,11 @@ export const App = () => {
     return <div className="gr-empty">{fatal}</div>
   }
   if (!payload) {
-    return <div className="gr-empty">Loading review…</div>
+    return (
+      <div className="gr-loading">
+        <Progress label="Loading review" />
+      </div>
+    )
   }
 
   const { review } = payload
@@ -80,46 +86,48 @@ export const App = () => {
     <div className="gr-shell">
       <Toolbar selector={payload.selector} mode={mode} onMode={setMode} />
 
-      <div className="gr-main" ref={scroller}>
-        {chapters.length === 0 && <div className="gr-empty">No changes between these commits.</div>}
-        {chapters.map(chapter => (
-          <section className="gr-chapter" key={chapter.id}>
-            <ChapterSummary
-              group={chapter.group}
-              paths={chapter.files.map(pathOf)}
-              files={review.files}
-              reviewedBlobs={reviewedBlobs}
-              onJumpToFile={jumpToFile}
-            />
-            <div className="gr-chapter-files">
-              {chapter.files.map(file => {
-                const path = pathOf(file)
-                const meta = review.files.find(f => f.path === path)
-                return (
-                  <FileDiff
-                    key={path}
-                    file={file}
-                    meta={meta}
-                    threads={threadsForPath(state.threads, path)}
-                    refractor={refractor}
-                    source={meta?.oldBlob ? sources[meta.oldBlob] : undefined}
-                    reviewed={isReviewed(reviewedBlobs[path], meta?.newBlob)}
-                    collapsed={collapsed.has(path)}
-                    forced={forced.has(path)}
-                    onToggleCollapsed={hidden => toggleCollapsed(path, hidden)}
-                    onToggleReviewed={() =>
-                      isReviewed(reviewedBlobs[path], meta?.newBlob)
-                        ? post({ type: 'unmarkReviewed', path })
-                        : post({ type: 'markReviewed', path, blob: meta?.newBlob ?? '' })
-                    }
-                  />
-                )
-              })}
-            </div>
-          </section>
-        ))}
-        {outdated.length > 0 && <OutdatedThreads threads={outdated} />}
-      </div>
+      <CodeLinksProvider version={state.refs.headSha}>
+        <div className="gr-main" ref={scroller}>
+          {chapters.length === 0 && <div className="gr-empty">No changes between these commits.</div>}
+          {chapters.map(chapter => (
+            <section className="gr-chapter" key={chapter.id}>
+              <ChapterSummary
+                group={chapter.group}
+                paths={chapter.files.map(pathOf)}
+                files={review.files}
+                reviewedBlobs={reviewedBlobs}
+                onJumpToFile={jumpToFile}
+              />
+              <div className="gr-chapter-files">
+                {chapter.files.map(file => {
+                  const path = pathOf(file)
+                  const meta = review.files.find(f => f.path === path)
+                  return (
+                    <FileDiff
+                      key={path}
+                      file={file}
+                      meta={meta}
+                      threads={threadsForPath(state.threads, path)}
+                      refractor={refractor}
+                      source={meta?.oldBlob ? sources[meta.oldBlob] : undefined}
+                      reviewed={isReviewed(reviewedBlobs[path], meta?.newBlob)}
+                      collapsed={collapsed.has(path)}
+                      forced={forced.has(path)}
+                      onToggleCollapsed={hidden => toggleCollapsed(path, hidden)}
+                      onToggleReviewed={() =>
+                        isReviewed(reviewedBlobs[path], meta?.newBlob)
+                          ? post({ type: 'unmarkReviewed', path })
+                          : post({ type: 'markReviewed', path, blob: meta?.newBlob ?? '' })
+                      }
+                    />
+                  )
+                })}
+              </div>
+            </section>
+          ))}
+          {outdated.length > 0 && <OutdatedThreads threads={outdated} />}
+        </div>
+      </CodeLinksProvider>
       <GuideStatus state={state} busy={payload.guideBusy} files={review.files} />
     </div>
   )

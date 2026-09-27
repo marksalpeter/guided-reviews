@@ -80,6 +80,32 @@ export class Git {
     return out.trim()
   }
 
+  /** checksOut reports whether the working tree holds exactly this commit, with nothing tracked modified. */
+  async checksOut(sha: string): Promise<boolean> {
+    if ((await this.tryGit(['rev-parse', '--verify', 'HEAD']))?.trim() !== sha) {
+      return false
+    }
+    const status = await this.tryGit(['status', '--porcelain', '--untracked-files=no'])
+    return status === ''
+  }
+
+  /** addDetachedWorktree checks a commit out at a path without taking a branch another worktree may hold. */
+  async addDetachedWorktree(path: string, sha: string): Promise<void> {
+    await this.git(['worktree', 'add', '--detach', '--force', path, sha])
+  }
+
+  /** removeWorktree deletes a checkout and git's record of it. */
+  async removeWorktree(path: string): Promise<void> {
+    await this.tryGit(['worktree', 'remove', '--force', path])
+    await this.tryGit(['worktree', 'prune'])
+  }
+
+  /** pathsAt lists every file a commit tracks. */
+  async pathsAt(sha: string): Promise<string[]> {
+    const out = await this.git(['ls-tree', '-r', '-z', '--name-only', sha])
+    return out.split('\0').filter(Boolean)
+  }
+
   /** changedFiles lists every path that differs between two commits, with blobs and counts. */
   async changedFiles(base: string, head: string): Promise<ChangedFile[]> {
     // --abbrev=40 because raw output shortens blob shas, and anchors are keyed by full blob

@@ -485,7 +485,8 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
    stacked bars would eat the panel, so the title bar stands down. The handles keep pinning
    under that band — see the rule beside the fold, which measures it. */
 @media (max-width: 900px) {
-  .gr-file-header { position: static; }
+  /* relative rather than static, so the running bar still sits along its lower edge */
+  .gr-file-header { position: relative; }
 }
 
 .gr-file-header > .gr-file-toggle,
@@ -908,5 +909,100 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 }
 
 .gr-empty { padding: 40px 14px; color: var(--vscode-descriptionForeground); line-height: 1.6; }
+
+/* the review has not arrived: VS Code's running bar along the top edge, and nothing else */
+.gr-loading { position: relative; height: 100vh; }
+.gr-loading > .gr-progress { top: 0; bottom: auto; }
+
+/* VS Code's own running bar: a short bit sliding across the edge it sits on. It waits a
+   quarter second before it shows, so an answer that comes quickly never flashes it. */
+.gr-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  animation: gr-progress-show 0s linear 250ms forwards;
+}
+.gr-progress::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2%;
+  height: 100%;
+  background: var(--vscode-progressBar-background, #0e70c0);
+  animation: gr-progress-run 4s linear infinite;
+}
+@keyframes gr-progress-show { to { opacity: 1; } }
+@keyframes gr-progress-run {
+  from { transform: translateX(0%) scaleX(1); }
+  50% { transform: translateX(2500%) scaleX(3); }
+  to { transform: translateX(4900%) scaleX(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gr-progress::before { width: 100%; opacity: 0.6; animation: none; }
+}
+
+/* ⌘ held over a symbol the language server can follow: the editor's own link colour */
+::highlight(gr-link) {
+  color: var(--vscode-editorLink-activeForeground, #4e94ce);
+  text-decoration: underline;
+}
+.diff-code.gr-linked { cursor: pointer; }
+
+/* the callers of a declaration, or a note that a symbol leads nowhere, in the editor's hover chrome */
+.gr-tip {
+  position: fixed;
+  z-index: 50;
+  min-width: 220px;
+  max-width: 480px;
+  overflow: hidden;
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+  font-size: 0.92em;
+}
+.gr-tip-head,
+.gr-tip-note { padding: 6px 10px; }
+.gr-tip-head {
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+}
+.gr-tip-list {
+  /* about ten rows, then it scrolls */
+  max-height: 240px;
+  overflow-y: auto;
+  padding-bottom: 4px;
+  border-top: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-panel-border));
+}
+.gr-tip-path { padding: 6px 10px 2px; font-weight: 600; }
+.gr-tip-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  padding: 2px 10px 2px 18px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-family: var(--vscode-editor-font-family);
+  font-size: inherit;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+.gr-tip-row:hover { background: var(--vscode-list-hoverBackground); }
+.gr-tip-line {
+  flex: none;
+  min-width: 3ch;
+  text-align: right;
+  color: var(--vscode-editorLineNumber-foreground);
+}
+.gr-tip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-outdated-list { padding: 10px 0 20px; }
 .gr-outdated-list h3 { font-size: 1em; margin: 0 0 8px; color: var(--vscode-descriptionForeground); }
