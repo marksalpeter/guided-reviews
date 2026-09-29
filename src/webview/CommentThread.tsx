@@ -16,6 +16,10 @@ export const CommentThread = ({ thread, quote }: { thread: Thread; quote?: Quote
   const [expanded, setExpanded] = useState(false)
   const resolved = thread.state === 'resolved'
 
+  useEffect(() => {
+    if (resolved) setExpanded(false)
+  }, [resolved])
+
   return (
     <div className={`gr-thread${resolved ? ' resolved' : ''}`} id={threadElementId(thread.id)}>
       <ResolveTick
@@ -23,11 +27,18 @@ export const CommentThread = ({ thread, quote }: { thread: Thread; quote?: Quote
         onToggle={() => post({ type: resolved ? 'reopen' : 'resolve', threadId: thread.id })}
       />
 
-      {resolved && !expanded ? (
-        <button className="gr-thread-collapsed" onClick={() => setExpanded(true)}>
-          {preview(thread)}
+      {resolved && (
+        <button
+          className={`gr-thread-toggle${expanded ? ' expanded' : ''}`}
+          aria-expanded={expanded}
+          aria-label={expanded ? 'Collapse thread' : 'Expand thread'}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? 'Resolved' : preview(thread)}
         </button>
-      ) : (
+      )}
+
+      {(!resolved || expanded) && (
         <>
           {thread.status === 'outdated' && <OutdatedNotice thread={thread} />}
           {quote && <QuoteBand quote={quote} />}

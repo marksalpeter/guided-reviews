@@ -753,7 +753,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 .gr-tick.checked { opacity: 1; color: var(--vscode-charts-green, var(--vscode-textLink-foreground)); }
 
-.gr-thread-collapsed {
+.gr-thread-toggle {
   display: block;
   width: 100%;
   text-align: left;
@@ -767,7 +767,8 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   white-space: nowrap;
 }
 
-.gr-thread-collapsed:hover { background: none; color: var(--vscode-foreground); }
+.gr-thread-toggle:hover { background: none; color: var(--vscode-foreground); }
+.gr-thread-toggle.expanded { width: auto; margin-bottom: 4px; }
 
 .gr-preview {
   margin: -10px -8px 0 -10px;

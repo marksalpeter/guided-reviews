@@ -88,6 +88,26 @@ describe('CommentThread', () => {
     expect(screen.getAllByTitle('agent')).toHaveLength(1)
     expect(screen.queryByText('agent')).toBeNull()
   })
+
+  it('collapses an opened resolved thread when its header is clicked again', () => {
+    render(<CommentThread thread={{ ...thread, state: 'resolved' }} />)
+
+    fireEvent.click(screen.getByLabelText('Expand thread'))
+    expect(screen.queryByRole('textbox')).not.toBeNull()
+
+    fireEvent.click(screen.getByLabelText('Collapse thread'))
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('collapses an opened thread each time it is resolved', () => {
+    const { rerender } = render(<CommentThread thread={{ ...thread, state: 'resolved' }} />)
+
+    fireEvent.click(screen.getByLabelText('Expand thread'))
+    rerender(<CommentThread thread={thread} />)
+    rerender(<CommentThread thread={{ ...thread, state: 'resolved' }} />)
+
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
 })
 
 describe('NewCommentBox', () => {
