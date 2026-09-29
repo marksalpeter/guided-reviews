@@ -58,7 +58,7 @@ export const FileDiff = ({
   const gaps = useGaps(file, source, expansions)
   useSettledPending(threads, pending, setPending)
   const borrowed = useBorrowed(gaps, source)
-  const hunks = useMemo(() => [...file.hunks, ...borrowed.values()], [file, borrowed])
+  const hunks = useMemo(() => inFileOrder([...file.hunks, ...borrowed.values()]), [file, borrowed])
   const tokens = useTokens(file, hunks, refractor)
   const highlight = useHighlighter(file, refractor)
   const widgets = useWidgets(file, hunks, threads, pending, setPending)
@@ -485,6 +485,11 @@ function hiddenLine(gap: Gap, thread: Thread): number | undefined {
     return undefined
   }
   return thread.anchor.side === 'old' ? line : line - gap.delta
+}
+
+/** inFileOrder sorts hunks by where they start, the order tokenize reads them in. */
+function inFileOrder(hunks: HunkData[]): HunkData[] {
+  return hunks.sort((a, b) => a.oldStart - b.oldStart)
 }
 
 /** pathOf is the file's current path, falling back to its pre-rename path. */

@@ -182,6 +182,21 @@ describe('FileDiff', () => {
     expect(coloured.style.color).toBe('rgb(106, 153, 85)')
   })
 
+  it('keeps colouring the patch below a run opened above it', () => {
+    const refractor = {
+      highlight: (value: string) => [
+        { type: 'element', tagName: 'span', properties: { style: 'color:#6a9955' }, children: [{ type: 'text', value }] },
+      ],
+    }
+    render(diffWith([], true, refractor, tsFile, tsMeta))
+
+    fireEvent.click(screen.getByText('30 lines unchanged'))
+
+    const cell = [...document.querySelectorAll('.diff-code')].find(code => code.textContent === 'LINE32')
+
+    expect(cell?.querySelector<HTMLElement>('span[style]')?.style.color).toBe('rgb(106, 153, 85)')
+  })
+
   it('offers to expand a reviewed file, which starts shut', () => {
     const shut = render(
       <FileDiff
