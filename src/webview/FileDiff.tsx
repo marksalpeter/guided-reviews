@@ -58,13 +58,13 @@ export const FileDiff = ({
   const gaps = useGaps(file, source, expansions)
   useSettledPending(threads, pending, setPending)
   const borrowed = useBorrowed(gaps, source)
-  const hunks = useMemo(() => inFileOrder([...file.hunks, ...borrowed.values()]), [file, borrowed])
-  const tokens = useTokens(file, hunks, refractor)
+  const hunks = useMemo(() => [...file.hunks, ...borrowed.values()], [file, borrowed])
+  const tokens = useTokens(file, refractor)
   const highlight = useHighlighter(file, refractor)
   const widgets = useWidgets(file, hunks, threads, pending, setPending)
   const links = useCodeLinks(pathOf(file))
 
-  const table = (hunk: HunkData) => (
+  const table = (hunk: HunkData, tokens: HunkTokens | undefined) => (
     <DiffTable file={file} hunk={hunk} tokens={tokens} widgets={widgets} codeEvents={links.events} onPick={setPending} />
   )
   const foldAt = (index: number) => {
@@ -79,7 +79,7 @@ export const FileDiff = ({
         buried={buriedIn(gap, threads)}
         source={source ?? []}
         highlight={highlight}
-        lines={lines ? table(lines) : null}
+        lines={lines ? table(lines, undefined) : null}
         onChange={shown => setExpansions(previous => ({ ...previous, [gap.index]: shown }))}
       />
     )
@@ -120,7 +120,7 @@ export const FileDiff = ({
             {file.hunks.map((hunk, index) => (
               <Fragment key={hunk.content}>
                 {foldAt(index)}
-                {table(hunk)}
+                {table(hunk, tokens)}
               </Fragment>
             ))}
             {foldAt(file.hunks.length)}
@@ -329,9 +329,10 @@ function useBorrowed(gaps: Gap[], source: string[] | undefined): Map<number, Hun
   }, [gaps, source])
 }
 
-/** useTokens highlights the file through Shiki, falling back to plain text on any failure. */
-function useTokens(file: FileData, hunks: HunkData[], refractor: RefractorLike | null): HunkTokens | undefined {
+/** useTokens highlights the patch's own hunks through Shiki, falling back to plain text on any failure. */
+function useTokens(file: FileData, refractor: RefractorLike | null): HunkTokens | undefined {
   return useMemo(() => {
+    const hunks = file.hunks
     const language = languageForPath(pathOf(file))
     try {
       if (language === plaintext || !refractor) {
@@ -346,7 +347,7 @@ function useTokens(file: FileData, hunks: HunkData[], refractor: RefractorLike |
     } catch {
       return undefined
     }
-  }, [file, hunks, refractor])
+  }, [file, refractor])
 }
 
 /** useWidgets maps each change key to the threads and composer rendered beneath that line. */
@@ -485,11 +486,6 @@ function hiddenLine(gap: Gap, thread: Thread): number | undefined {
     return undefined
   }
   return thread.anchor.side === 'old' ? line : line - gap.delta
-}
-
-/** inFileOrder sorts hunks by where they start, the order tokenize reads them in. */
-function inFileOrder(hunks: HunkData[]): HunkData[] {
-  return hunks.sort((a, b) => a.oldStart - b.oldStart)
 }
 
 /** pathOf is the file's current path, falling back to its pre-rename path. */
