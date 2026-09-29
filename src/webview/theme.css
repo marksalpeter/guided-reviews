@@ -660,7 +660,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px 12px;
+  padding: 13px;
   background: var(--vscode-editor-background);
 }
 
@@ -692,7 +692,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 /* ── threads ───────────────────────────────────────────────────────────── */
 
 /* a thread hangs off the line it marks, not off a column of its own */
-.gr-widget { padding: 10px 9px; border-top: 1px solid var(--vscode-panel-border); border-bottom: 1px solid var(--vscode-panel-border); }
+.gr-widget { padding: 13px 12px; border-top: 1px solid var(--vscode-panel-border); border-bottom: 1px solid var(--vscode-panel-border); }
 
 .gr-thread {
   position: relative;
@@ -705,6 +705,10 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 }
 
 .gr-widget > :last-child { margin-bottom: 0; }
+
+@media (max-width: 900px) {
+  .gr-thread { max-width: none; }
+}
 
 .gr-thread.focused { border-color: var(--vscode-focusBorder); box-shadow: 0 0 0 1px var(--vscode-focusBorder); }
 
