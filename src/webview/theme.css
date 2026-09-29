@@ -701,14 +701,9 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   border-radius: var(--gr-card-radius);
   padding: 10px 8px 10px 10px;
   margin-bottom: 8px;
-  max-width: 760px;
 }
 
 .gr-widget > :last-child { margin-bottom: 0; }
-
-@media (max-width: 900px) {
-  .gr-thread { max-width: none; }
-}
 
 .gr-thread.focused { border-color: var(--vscode-focusBorder); box-shadow: 0 0 0 1px var(--vscode-focusBorder); }
 
