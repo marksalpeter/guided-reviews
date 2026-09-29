@@ -767,6 +767,8 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   white-space: nowrap;
 }
 
+.gr-thread-collapsed:hover { background: none; color: var(--vscode-foreground); }
+
 .gr-preview {
   margin: -10px -8px 0 -10px;
   padding: 8px 34px 8px 10px;
