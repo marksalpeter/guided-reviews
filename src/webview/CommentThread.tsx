@@ -27,14 +27,9 @@ export const CommentThread = ({ thread, quote }: { thread: Thread; quote?: Quote
         onToggle={() => post({ type: resolved ? 'reopen' : 'resolve', threadId: thread.id })}
       />
 
-      {resolved && (
-        <button
-          className={`gr-thread-toggle${expanded ? ' expanded' : ''}`}
-          aria-expanded={expanded}
-          aria-label={expanded ? 'Collapse thread' : 'Expand thread'}
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? 'Resolved' : preview(thread)}
+      {resolved && !expanded && (
+        <button className="gr-thread-toggle" aria-label="Expand thread" onClick={() => setExpanded(true)}>
+          {preview(thread)}
         </button>
       )}
 
@@ -42,7 +37,7 @@ export const CommentThread = ({ thread, quote }: { thread: Thread; quote?: Quote
         <>
           {thread.status === 'outdated' && <OutdatedNotice thread={thread} />}
           {quote && <QuoteBand quote={quote} />}
-          <div className="gr-comments">
+          <div className="gr-comments" onClick={resolved ? () => collapseUnlessSelecting(setExpanded) : undefined}>
             {thread.comments.map(comment => (
               <CommentBody
                 key={comment.id}
@@ -114,7 +109,15 @@ const CommentBody = ({ comment, onDelete }: { comment: Comment; onDelete: () => 
       {comment.author === 'agent' && <i className="gr-comment-dot" title="agent" />}
     </span>
     <div className="gr-comment-body">{comment.body}</div>
-    <button className="gr-comment-delete" aria-label="Delete comment" title="Delete comment" onClick={onDelete}>
+    <button
+      className="gr-comment-delete"
+      aria-label="Delete comment"
+      title="Delete comment"
+      onClick={event => {
+        event.stopPropagation()
+        onDelete()
+      }}
+    >
       <TrashIcon />
     </button>
   </div>
@@ -248,6 +251,11 @@ function grow(field: HTMLTextAreaElement): void {
 /** window lists the line numbers between two bounds. */
 function window(from: number, to: number): number[] {
   return Array.from({ length: Math.max(0, to - from) }, (_, offset) => from + offset)
+}
+
+/** collapseUnlessSelecting folds a thread back up unless the click ended a text selection. */
+function collapseUnlessSelecting(setExpanded: (expanded: boolean) => void): void {
+  if (!document.getSelection()?.toString()) setExpanded(false)
 }
 
 /** preview is the one-line summary a resolved thread collapses to. */

@@ -768,7 +768,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 }
 
 .gr-thread-toggle:hover { background: none; color: var(--vscode-foreground); }
-.gr-thread-toggle.expanded { width: auto; margin-bottom: 4px; }
+.gr-thread.resolved .gr-comments { cursor: pointer; }
 
 .gr-preview {
   margin: -10px -8px 0 -10px;

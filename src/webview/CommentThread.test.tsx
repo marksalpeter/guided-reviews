@@ -89,14 +89,31 @@ describe('CommentThread', () => {
     expect(screen.queryByText('agent')).toBeNull()
   })
 
-  it('collapses an opened resolved thread when its header is clicked again', () => {
+  it('collapses an opened resolved thread when one of its comments is clicked', () => {
     render(<CommentThread thread={{ ...thread, state: 'resolved' }} />)
 
     fireEvent.click(screen.getByLabelText('Expand thread'))
     expect(screen.queryByRole('textbox')).not.toBeNull()
 
-    fireEvent.click(screen.getByLabelText('Collapse thread'))
+    fireEvent.click(screen.getByText('fixed'))
     expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('keeps an opened resolved thread open while its reply box is clicked', () => {
+    const { container } = render(<CommentThread thread={{ ...thread, state: 'resolved' }} />)
+
+    fireEvent.click(screen.getByLabelText('Expand thread'))
+    fireEvent.click(container.querySelector('.gr-composer') as HTMLElement)
+
+    expect(screen.queryByRole('textbox')).not.toBeNull()
+  })
+
+  it('keeps an open thread open when one of its comments is clicked', () => {
+    render(<CommentThread thread={thread} />)
+
+    fireEvent.click(screen.getByText('fixed'))
+
+    expect(screen.queryByRole('textbox')).not.toBeNull()
   })
 
   it('collapses an opened thread each time it is resolved', () => {
