@@ -692,7 +692,7 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 /* ── threads ───────────────────────────────────────────────────────────── */
 
 /* a thread hangs off the line it marks, not off a column of its own */
-.gr-widget { padding: 8px 10px 10px 12px; border-top: 1px solid var(--vscode-panel-border); border-bottom: 1px solid var(--vscode-panel-border); }
+.gr-widget { padding: 10px 9px; border-top: 1px solid var(--vscode-panel-border); border-bottom: 1px solid var(--vscode-panel-border); }
 
 .gr-thread {
   position: relative;
@@ -703,6 +703,8 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   margin-bottom: 8px;
   max-width: 760px;
 }
+
+.gr-widget > :last-child { margin-bottom: 0; }
 
 .gr-thread.focused { border-color: var(--vscode-focusBorder); box-shadow: 0 0 0 1px var(--vscode-focusBorder); }
 
