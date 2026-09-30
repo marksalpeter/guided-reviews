@@ -15,6 +15,7 @@ const shared = {
 const targets = [
   { ...shared, entryPoints: ['src/extension/extension.ts'], outfile: 'dist/extension.js', external: ['vscode'] },
   { ...shared, entryPoints: ['src/cli/main.ts'], outfile: 'dist/cli.js', external: [], banner: { js: '#!/usr/bin/env node' } },
+  { ...shared, entryPoints: ['src/cli/bin.ts'], outfile: 'dist/review.js', external: [], banner: { js: '#!/usr/bin/env node' } },
 ]
 
 if (watch) {

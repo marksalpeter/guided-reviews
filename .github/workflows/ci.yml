@@ -39,9 +39,22 @@ jobs:
       - name: Package the extension
         run: npx vsce package --out guided-reviews-pr.vsix
 
+      - uses: oven-sh/setup-bun@v2
+
+      # the webview build above is embedded into the single review binary
+      - run: node scripts/build-bin.mjs
+      - run: ./dist/review --help
+
       - uses: actions/upload-artifact@v4
         with:
           name: guided-reviews-vsix
           path: guided-reviews-pr.vsix
+          if-no-files-found: error
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: review-binary
+          path: dist/review
           if-no-files-found: error
           retention-days: 14

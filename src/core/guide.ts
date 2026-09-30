@@ -25,9 +25,9 @@ const groupSystemPrompt = [
 
 /** GuideGenerator turns a diff into ordered, validated guide chapters. */
 export class GuideGenerator {
-  private runner: ClaudeRunner
+  private runner: GuideRunner
 
-  constructor(runner: ClaudeRunner) {
+  constructor(runner: GuideRunner) {
     this.runner = runner
   }
 
@@ -52,19 +52,80 @@ export class GuideGenerator {
   }
 }
 
-/** ClaudeCli runs one headless, tool-free `claude -p` turn and returns its raw stdout. */
-export class ClaudeCli implements ClaudeRunner {
-  private command: string
-  private model: string
+/** AgentCommand is a headless preset. Cursor has none, so it uses claude. */
+export type AgentCommand = 'claude' | 'codex'
 
-  constructor(command = 'claude', model = 'claude-opus-5') {
-    this.command = command
-    this.model = model
+/** AgentOptions override the preset's binary and model. */
+export interface AgentOptions {
+  bin?: string
+  model?: string
+}
+
+/** AgentRunner is one tool-free headless turn. `cmd` selects the preset's flags. */
+export class AgentRunner {
+  private cmd: AgentCommand
+  private options: AgentOptions
+
+  constructor(cmd: AgentCommand = 'claude', options: AgentOptions = {}) {
+    this.cmd = cmd
+    this.options = options
   }
 
+  /** run sends one prompt and returns the process's raw stdout. */
   run(prompt: string, stdin: string, system: string): Promise<string> {
+    const launch = agentPlan(this.cmd, this.options, prompt, system, stdin, process.env)
+    return new Promise((resolve, reject) => {
+      const child = spawn(launch.command, launch.args, { stdio: ['pipe', 'pipe', 'pipe'], env: launch.env })
+      let out = ''
+      let err = ''
+      child.stdout.on('data', (d: Buffer) => (out += d.toString()))
+      child.stderr.on('data', (d: Buffer) => (err += d.toString()))
+      child.on('error', e => reject(new Error(`could not run ${launch.command}: ${e.message}`)))
+      child.on('close', code => {
+        if (code === 0) {
+          resolve(out)
+          return
+        }
+        reject(new Error(err.trim() || `${launch.command} exited with code ${code}`))
+      })
+      child.stdin.end(launch.input)
+    })
+  }
+}
+
+/** GuideRunner is the inference seam. Tests pass a fake; production passes AgentRunner. */
+export type GuideRunner = Pick<AgentRunner, 'run'>
+
+/** ClaudeCli is the Claude preset the extension constructs from its settings. */
+export class ClaudeCli extends AgentRunner {
+  constructor(command = 'claude', model = 'claude-opus-5') {
+    super('claude', { bin: command, model })
+  }
+}
+
+/** agentPlan is the argv and stdin for one preset. The diff stays on stdin so a long patch is not an argument. */
+export function agentPlan(
+  cmd: AgentCommand,
+  options: AgentOptions,
+  prompt: string,
+  system: string,
+  diff: string,
+  parentEnv: NodeJS.ProcessEnv,
+): AgentLaunch {
+  const env = childEnv(parentEnv, cmd)
+  if (cmd === 'codex') {
+    return {
+      command: options.bin || 'codex',
+      // no prompt argument: `codex exec` reads the prompt from stdin when one is not given
+      args: ['exec', '--skip-git-repo-check', '-s', 'read-only', ...(options.model ? ['--model', options.model] : [])],
+      input: [system, prompt, diff].filter(part => part.length > 0).join('\n\n'),
+      env,
+    }
+  }
+  return {
+    command: options.bin || 'claude',
     // no tools: grouping is pure inference, and it must not be able to touch the repo it reviews
-    const args = [
+    args: [
       '-p',
       prompt,
       '--output-format',
@@ -72,31 +133,35 @@ export class ClaudeCli implements ClaudeRunner {
       '--max-turns',
       '1',
       '--model',
-      this.model,
+      options.model || 'claude-opus-5',
       '--allowed-tools',
       '',
       '--append-system-prompt',
       system,
-    ]
-    return new Promise((resolve, reject) => {
-      // grouping is a judgement call, so buy it room to think before it commits to chapters
-      const env = { ...process.env, MAX_THINKING_TOKENS: '8000' }
-      const child = spawn(this.command, args, { stdio: ['pipe', 'pipe', 'pipe'], env })
-      let out = ''
-      let err = ''
-      child.stdout.on('data', (d: Buffer) => (out += d.toString()))
-      child.stderr.on('data', (d: Buffer) => (err += d.toString()))
-      child.on('error', e => reject(new Error(`could not run ${this.command}: ${e.message}`)))
-      child.on('close', code => {
-        if (code === 0) {
-          resolve(out)
-          return
-        }
-        reject(new Error(err.trim() || `${this.command} exited with code ${code}`))
-      })
-      child.stdin.end(stdin)
-    })
+    ],
+    input: diff,
+    env,
   }
+}
+
+/** childEnv drops the nested-session marker and, for Claude, allows the grouping pass to think. */
+function childEnv(parent: NodeJS.ProcessEnv, cmd: AgentCommand): NodeJS.ProcessEnv {
+  const env = { ...parent }
+  // Claude Code refuses to start when this is already set, which it is when Claude itself launched us
+  delete env.CLAUDECODE
+  delete env.CLAUDE_CODE
+  if (cmd === 'claude') {
+    env.MAX_THINKING_TOKENS = '8000'
+  }
+  return env
+}
+
+/** AgentLaunch is one ready-to-spawn headless process. */
+export interface AgentLaunch {
+  command: string
+  args: string[]
+  input: string
+  env: NodeJS.ProcessEnv
 }
 
 /** buildDescribePrompt states the exact set of paths the model must describe. */
@@ -249,11 +314,6 @@ function* balancedObjects(text: string): Generator<string> {
 /** slug reduces a title to an id-safe fragment. */
 function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'group'
-}
-
-/** ClaudeRunner is the inference seam, mocked in tests and backed by `claude -p` in production. */
-export interface ClaudeRunner {
-  run(prompt: string, stdin: string, system: string): Promise<string>
 }
 
 /** FileNote is one file's description, the only thing the grouping pass sees. */

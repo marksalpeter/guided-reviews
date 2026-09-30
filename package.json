@@ -99,6 +99,7 @@
   "scripts": {
     "build": "npm run build:webview && npm run build:node",
     "build:node": "node esbuild.mjs",
+    "build:bin": "npm run build:webview && node scripts/build-bin.mjs",
     "build:webview": "vite build",
     "gen:grammars": "node scripts/gen-grammars.mjs",
     "watch": "node esbuild.mjs --watch",

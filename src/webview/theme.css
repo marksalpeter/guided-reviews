@@ -28,6 +28,61 @@ body.vscode-light, body.vscode-high-contrast-light {
   --gr-faint: #9a9a9a;
 }
 
+/* the browser has no editor theme, so the same variables the panel already reads get a default */
+body:not([class*='vscode-']) {
+  --vscode-editor-background: #1f1f1f;
+  --vscode-editor-foreground: #cccccc;
+  --vscode-foreground: #cccccc;
+  --vscode-descriptionForeground: #9d9d9d;
+  --vscode-font-family: ui-sans-serif, system-ui, sans-serif;
+  --vscode-font-size: 13px;
+  --vscode-editor-font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --vscode-editor-font-size: 13px;
+  --vscode-button-background: #0e639c;
+  --vscode-button-foreground: #ffffff;
+  --vscode-button-hoverBackground: #1177bb;
+  --vscode-button-secondaryForeground: #cccccc;
+  --vscode-button-secondaryBackground: transparent;
+  --vscode-focusBorder: #007fd4;
+  --vscode-panel-border: #2b2b2b;
+  --vscode-input-background: #3c3c3c;
+  --vscode-input-foreground: #cccccc;
+  --vscode-input-border: #3c3c3c;
+  --vscode-textLink-foreground: #4daafc;
+  --vscode-charts-orange: #e8973a;
+  --vscode-editorGutter-background: #1f1f1f;
+  --vscode-diffEditor-insertedLineBackground: #1b3a1b;
+  --vscode-diffEditor-removedLineBackground: #3f1d1d;
+  --vscode-diffEditor-insertedTextBackground: #1b3a1b;
+  --vscode-diffEditor-removedTextBackground: #3f1d1d;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  body:not([class*='vscode-']) {
+    --vscode-editor-background: #ffffff;
+    --vscode-editor-foreground: #1f1f1f;
+    --vscode-foreground: #1f1f1f;
+    --vscode-descriptionForeground: #616161;
+    --vscode-button-background: #0a69da;
+    --vscode-button-foreground: #ffffff;
+    --vscode-button-hoverBackground: #0958b8;
+    --vscode-button-secondaryForeground: #1f1f1f;
+    --vscode-panel-border: #e5e5e5;
+    --vscode-input-background: #ffffff;
+    --vscode-input-foreground: #1f1f1f;
+    --vscode-input-border: #cecece;
+    --vscode-textLink-foreground: #0a69da;
+    --vscode-charts-orange: #b45309;
+    --vscode-editorGutter-background: #ffffff;
+    --vscode-diffEditor-insertedLineBackground: #e6ffec;
+    --vscode-diffEditor-removedLineBackground: #ffebe9;
+    --vscode-diffEditor-insertedTextBackground: #e6ffec;
+    --vscode-diffEditor-removedTextBackground: #ffebe9;
+    color-scheme: light;
+  }
+}
+
 body {
   margin: 0;
   padding: 0;

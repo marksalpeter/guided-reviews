@@ -227,6 +227,8 @@ export class ReviewPanel {
           return await this.references(message.id, message.path, message.line, message.character)
         case 'openLocation':
           return await this.navigator.open(message.location)
+        case 'submit':
+          return
       }
       await this.push()
     } catch (error) {

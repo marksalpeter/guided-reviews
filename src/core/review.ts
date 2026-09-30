@@ -3,7 +3,7 @@ import { anchorContext, contextHash, relocate } from './anchors.js'
 import type { ReviewEvent } from './events.js'
 import { schemaVersion } from './events.js'
 import { Git } from './git.js'
-import { GuideGenerator, type ClaudeRunner } from './guide.js'
+import { GuideGenerator, type GuideRunner } from './guide.js'
 import type { SelectorState } from './protocol.js'
 import { ReviewStore } from './store.js'
 import type { Anchor, ChangedFile, LineAnchor, ReviewRefs, ReviewState, Thread } from './types.js'
@@ -198,7 +198,7 @@ export class ReviewService {
   }
 
   /** generateGuide runs inference for the current head and records success or failure. */
-  async generateGuide(key: string, runner: ClaudeRunner): Promise<void> {
+  async generateGuide(key: string, runner: GuideRunner): Promise<void> {
     const { state, files } = await this.load(key)
     try {
       const diff = await this.git.unifiedDiff(state.refs.baseSha, state.refs.headSha)

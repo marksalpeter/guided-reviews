@@ -54,6 +54,7 @@ export type ViewMessage =
   | { type: 'lookup'; id: number; path: string; line: number; character: number }
   | { type: 'references'; id: number; path: string; line: number; character: number }
   | { type: 'openLocation'; location: CodeLocation }
+  | { type: 'submit' }
 
 /** Lookup is what the language server knows about the symbol under the pointer, on the new side of the diff. */
 export type Lookup =

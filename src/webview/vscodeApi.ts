@@ -3,9 +3,36 @@ import type { ViewMessage } from '../core/protocol.js'
 /** vscode is the host bridge, acquired once because the API may only be taken a single time. */
 const vscode = acquire()
 
-/** post sends one message to the extension host. */
+/** browserHost is the compiled review binary, which has no editor bridge. */
+export const browserHost = vscode === undefined && typeof window !== 'undefined'
+
+/** post sends one message to the extension host, or to the local review server. */
 export function post(message: ViewMessage): void {
-  vscode?.postMessage(message)
+  if (vscode) {
+    vscode.postMessage(message)
+    return
+  }
+  if (typeof fetch === 'undefined') {
+    return
+  }
+  void fetch('/api/message', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(message),
+  })
+}
+
+connectBrowserHost()
+
+/** connectBrowserHost turns server-sent events into the same window messages the editor posts. */
+function connectBrowserHost(): void {
+  if (!browserHost || typeof EventSource === 'undefined') {
+    return
+  }
+  const source = new EventSource('/api/events')
+  source.onmessage = event => {
+    window.dispatchEvent(new MessageEvent('message', { data: JSON.parse(String(event.data)) }))
+  }
 }
 
 /** saveViewState persists ephemeral view state so a restored tab looks the way it was left. */

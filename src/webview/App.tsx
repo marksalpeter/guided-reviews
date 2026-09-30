@@ -12,7 +12,7 @@ import { FileList, isReviewed, reviewedCount } from './FileList.js'
 import { GuideStatus } from './GuideStatus.js'
 import { activeTheme, loadRefractor, type RefractorLike } from './highlight.js'
 import { Progress } from './Progress.js'
-import { loadViewState, post, saveViewState } from './vscodeApi.js'
+import { browserHost, loadViewState, post, saveViewState } from './vscodeApi.js'
 
 /** withPath adds or drops one path from a set, leaving the set it was given alone. */
 export function withPath(paths: ReadonlySet<string>, path: string, present: boolean): Set<string> {
@@ -146,6 +146,11 @@ const Toolbar = ({
   <div className="gr-toolbar">
     <BranchBar selector={selector} />
     <span className="gr-spacer" />
+    {browserHost && (
+      <button className="gr-submit" onClick={() => post({ type: 'submit' })}>
+        Submit
+      </button>
+    )}
     <div className="gr-modes">
       <button aria-pressed={mode === 'guided'} onClick={() => onMode('guided')}>
         Guided
