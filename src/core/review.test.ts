@@ -320,6 +320,28 @@ describe('ReviewService', () => {
     expect((await service.load(key)).state.threads[0]?.state).toBe('open')
   })
 
+  it('unchecks a reviewed file when the agent replies, so the response is on screen', async () => {
+    const key = await service.openBranchReview()
+    const file = (await service.load(key)).files[0]!
+    const id = await service.startThread(key, file.path, 'new', 4, 'fix this')
+    await service.markReviewed(key, file.path, file.newBlob!)
+
+    await service.reply(key, id, 'fixed in abc123', 'agent')
+
+    expect((await service.load(key)).state.reviewedBlobs).toEqual({})
+  })
+
+  it('leaves a reviewed file checked when the human replies', async () => {
+    const key = await service.openBranchReview()
+    const file = (await service.load(key)).files[0]!
+    const id = await service.startThread(key, file.path, 'new', 4, 'fix this')
+    await service.markReviewed(key, file.path, file.newBlob!)
+
+    await service.reply(key, id, 'one more thing', 'human')
+
+    expect((await service.load(key)).state.reviewedBlobs[file.path]).toBe(file.newBlob)
+  })
+
   it('does not stack reopen events when replying to an already open thread', async () => {
     const key = await service.openBranchReview()
     const id = await service.startThread(key, 'a.ts', 'new', 4, 'fix this')

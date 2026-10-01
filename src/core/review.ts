@@ -159,7 +159,8 @@ export class ReviewService {
   /** reply appends a message, reopening the thread when it had already been resolved. */
   async reply(key: string, threadId: string, body: string, author: 'human' | 'agent'): Promise<void> {
     const state = await this.store.load(key)
-    if (state.threads.find(thread => thread.id === threadId)?.state === 'resolved') {
+    const thread = state.threads.find(item => item.id === threadId)
+    if (thread?.state === 'resolved') {
       await this.store.append(key, { t: 'thread.reopened', threadId, at: now() })
     }
     await this.store.append(key, {
@@ -170,6 +171,14 @@ export class ReviewService {
       body,
       at: now(),
     })
+    // a reviewed file is shut, so an agent reply would land where the human cannot see it
+    if (author === 'agent' && thread) {
+      for (const path of anchorPaths(thread)) {
+        if (path in state.reviewedBlobs) {
+          await this.unmarkReviewed(key, path)
+        }
+      }
+    }
   }
 
   /** markReviewed ticks a file off against the blob currently shown, so a later edit clears it. */
@@ -301,6 +310,11 @@ export class ReviewService {
       ? { ...thread, status: 'outdated' }
       : { ...thread, status: outcome.status, resolvedLine: outcome.line }
   }
+}
+
+/** anchorPaths are the files an agent reply should bring back into view. */
+function anchorPaths(thread: Thread): readonly string[] {
+  return thread.anchor.kind === 'line' ? [thread.anchor.path] : thread.anchor.files
 }
 
 /** now is the timestamp written on every appended event. */
