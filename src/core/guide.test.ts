@@ -169,6 +169,18 @@ describe('parseDescriptions', () => {
   })
 })
 
+describe('describeBatches', () => {
+  it('puts a file with about a thousand changed lines in a batch by itself', () => {
+    const files = [
+      { ...file('big.ts'), additions: 1000, deletions: 0 },
+      ...Array.from({ length: 9 }, (_, index) => file(`f${index}.ts`)),
+    ]
+    const batches = describeBatches(files)
+    expect(batches).toHaveLength(8)
+    expect(batches.find(batch => batch.some(entry => entry.path === 'big.ts'))).toEqual([files[0]])
+  })
+})
+
 describe('GuideGenerator', () => {
   /** twoPass answers every description batch from the paths, then the grouping pass verbatim. */
   const twoPass = (grouping: string, paths: readonly string[] = ['a.ts']) => {
@@ -248,9 +260,11 @@ describe('GuideGenerator', () => {
     let inFlight = 0
     let maxInFlight = 0
     const describeStdins: string[] = []
+    let groupPrompt = ''
     const runner = {
       run: async (prompt: string, stdin: string) => {
         if (!prompt.startsWith('Describe')) {
+          groupPrompt = prompt
           return JSON.stringify({ result: '{"groups":[{"title":"C","summary":"s","files":["f0.ts"]}]}' })
         }
         inFlight += 1
@@ -270,10 +284,12 @@ describe('GuideGenerator', () => {
     expect(maxInFlight).toBe(8)
     expect(describeStdins).toHaveLength(8)
     const first = describeStdins.find(stdin => stdin.includes('diff --git a/f0.ts'))
-    expect(first).toContain('diff --git a/f1.ts')
-    expect(first).not.toContain('diff --git a/f2.ts')
+    expect(first).toContain('diff --git a/f8.ts')
+    expect(first).not.toContain('diff --git a/f1.ts')
     const last = describeStdins.find(stdin => stdin.includes('diff --git a/f9.ts'))
+    expect(last).toContain('diff --git a/f1.ts')
     expect(last).not.toContain('diff --git a/f0.ts')
+    expect(groupPrompt).toContain(files.map(entry => `- ${entry.path}: does something`).join('\n'))
   })
 
   it('keeps the diff out of the grouping pass', async () => {

@@ -41,7 +41,11 @@ export class GuideGenerator {
     const described = await Promise.all(
       batches.map(batch => this.runner.run(buildDescribePrompt(batch), diffForFiles(diff, batch.map(file => file.path)), describeSystemPrompt)),
     )
-    const notes = batches.flatMap((batch, index) => parseDescriptions(described[index] ?? '', batch.map(file => file.path)))
+    const order = new Map(files.map((file, index) => [file.path, index]))
+    // batches are packed by size; the grouping prompt still sees files in input order
+    const notes = batches
+      .flatMap((batch, index) => parseDescriptions(described[index] ?? '', batch.map(file => file.path)))
+      .sort((a, b) => (order.get(a.path) ?? files.length) - (order.get(b.path) ?? files.length))
     if (notes.length === 0) {
       throw new Error('the guided review could not describe any changed file')
     }
@@ -170,23 +174,29 @@ export interface AgentLaunch {
   env: NodeJS.ProcessEnv
 }
 
-/** describeBatches splits the files across min(count, 8) summarizers, as evenly as the count allows. */
+/** describeBatches spreads files across min(count, 8) summarizers, balancing by changed lines so one large diff does not share a summarizer with a pile of small ones. */
 export function describeBatches(files: readonly ChangedFile[]): ChangedFile[][] {
-  const batches = Math.min(files.length, describeParallelism)
-  if (batches === 0) {
+  const count = Math.min(files.length, describeParallelism)
+  if (count === 0) {
     return []
   }
-  const base = Math.floor(files.length / batches)
-  let extra = files.length % batches
-  const groups: ChangedFile[][] = []
-  let index = 0
-  for (let i = 0; i < batches; i++) {
-    const size = base + (extra > 0 ? 1 : 0)
-    extra = Math.max(0, extra - 1)
-    groups.push(files.slice(index, index + size))
-    index += size
+  // longest-processing-time-first: heaviest file first (input order breaks ties), then the lightest batch
+  const ranked = files
+    .map((file, index) => ({ file, index, weight: Math.max(1, file.additions + file.deletions) }))
+    .sort((a, b) => b.weight - a.weight || a.index - b.index)
+  const loads = Array.from({ length: count }, () => 0)
+  const groups: { file: ChangedFile; index: number }[][] = Array.from({ length: count }, () => [])
+  for (const item of ranked) {
+    let lightest = 0
+    for (let batch = 1; batch < count; batch++) {
+      if ((loads[batch] ?? 0) < (loads[lightest] ?? 0)) {
+        lightest = batch
+      }
+    }
+    loads[lightest] = (loads[lightest] ?? 0) + item.weight
+    groups[lightest]?.push(item)
   }
-  return groups
+  return groups.map(group => group.sort((a, b) => a.index - b.index).map(item => item.file))
 }
 
 /** diffForFiles is the patch slice for one batch. A diff with no file headers is returned whole. */
