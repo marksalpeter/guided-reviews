@@ -5,6 +5,15 @@
     <title>Guided Reviews</title>
   </head>
   <body>
+    <script>
+      /* paint the saved scheme, or the system one, before the bundle loads. matches scheme.ts */
+      ;(function () {
+        if (typeof acquireVsCodeApi === 'function') return
+        var stored = document.cookie.match(/(?:^|;\s*)gr-scheme=(light|dark)(?:;|$)/)
+        var light = stored ? stored[1] === 'light' : window.matchMedia('(prefers-color-scheme: light)').matches
+        document.body.classList.add(light ? 'gr-light' : 'gr-dark')
+      })()
+    </script>
     <div id="root"></div>
     <script type="module" src="./main.tsx"></script>
   </body>

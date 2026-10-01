@@ -22,7 +22,7 @@
   --gr-faint: #6e6e6e;
 }
 
-body.vscode-light, body.vscode-high-contrast-light {
+body.vscode-light, body.vscode-high-contrast-light, body.gr-light {
   --gr-after: var(--vscode-textLink-foreground, #0a69da);
   --gr-before: var(--vscode-charts-orange, #b45309);
   --gr-faint: #9a9a9a;
@@ -85,8 +85,8 @@ body:not([class*='vscode-']) {
   color-scheme: dark;
 }
 
-@media (prefers-color-scheme: light) {
-  body:not([class*='vscode-']) {
+/* .gr-light is set before paint, from the saved choice or the system scheme */
+body.gr-light:not([class*='vscode-']) {
     --vscode-foreground: #202020;
     --vscode-descriptionForeground: #606060;
     --vscode-errorForeground: #ad0707;
@@ -132,8 +132,7 @@ body:not([class*='vscode-']) {
     --vscode-widget-shadow: #00000000;
     --vscode-gitDecoration-addedResourceForeground: #587c0c;
     --vscode-gitDecoration-deletedResourceForeground: #ad0707;
-    color-scheme: light;
-  }
+  color-scheme: light;
 }
 
 body {
@@ -201,9 +200,14 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 .gr-spacer { flex: 1; }
 
-.gr-modes { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--vscode-panel-border); border-radius: 999px; }
-.gr-modes button { background: transparent; color: var(--vscode-foreground); border-radius: 999px; padding: 5px 14px; }
-.gr-modes button[aria-pressed='true'] { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+.gr-modes, .gr-scheme { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--vscode-panel-border); border-radius: 999px; }
+.gr-modes button, .gr-scheme button { background: transparent; color: var(--vscode-foreground); border-radius: 999px; padding: 5px 14px; }
+.gr-modes button[aria-pressed='true'], .gr-scheme button[aria-pressed='true'] { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+
+/* icon segments, the same height as a Guided/Diff label */
+.gr-scheme button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; }
+.gr-scheme button:hover { background: var(--vscode-toolbar-hoverBackground); }
+.gr-scheme button[aria-pressed='true']:hover { background: var(--vscode-button-hoverBackground); }
 
 /* a pill of its own, the same height as the view toggle, and the last thing in the bar */
 .gr-submit {

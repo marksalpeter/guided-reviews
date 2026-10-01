@@ -12,6 +12,7 @@ import { FileList, isReviewed, reviewedCount } from './FileList.js'
 import { GuideStatus } from './GuideStatus.js'
 import { activeTheme, loadRefractor, type RefractorLike } from './highlight.js'
 import { Progress } from './Progress.js'
+import { applyScheme, currentScheme, readScheme, storeScheme, type ColorScheme } from './scheme.js'
 import { browserHost, loadViewState, post, saveViewState } from './vscodeApi.js'
 
 /** withPath adds or drops one path from a set, leaving the set it was given alone. */
@@ -47,7 +48,8 @@ export const App = () => {
 
   // the host sends a fresh payload object on every action, so both memos key on the text they parse
   const files = useMemo(() => (payload ? parseDiff(payload.review.diff) : []), [payload?.review.diff])
-  const refractor = useRefractor(files)
+  const scheme = useBrowserScheme()
+  const refractor = useRefractor(files, scheme?.value)
   const chapters = useChapters(files, payload?.review.state.guide, mode)
   const scroller = useRef<HTMLDivElement>(null)
   useScrollAnchor(scroller, chapters)
@@ -84,7 +86,7 @@ export const App = () => {
 
   return (
     <div className="gr-shell">
-      <Toolbar selector={payload.selector} mode={mode} onMode={setMode} />
+      <Toolbar selector={payload.selector} mode={mode} onMode={setMode} scheme={scheme} />
 
       <CodeLinksProvider version={state.refs.headSha}>
         <div className="gr-main" ref={scroller}>
@@ -133,15 +135,17 @@ export const App = () => {
   )
 }
 
-/** Toolbar is the sticky header: the ref selectors on the left, the view toggle, then Submit at the far right. */
+/** Toolbar is the sticky header: refs on the left, then the view toggle, the scheme toggle, and Submit. */
 const Toolbar = ({
   selector,
   mode,
   onMode,
+  scheme,
 }: {
   selector: ReviewPayload['selector']
   mode: Mode
   onMode: (mode: Mode) => void
+  scheme?: BrowserScheme
 }) => (
   <div className="gr-toolbar">
     <BranchBar selector={selector} />
@@ -154,6 +158,16 @@ const Toolbar = ({
         Diff
       </button>
     </div>
+    {scheme && (
+      <div className="gr-scheme" role="group" aria-label="Color scheme">
+        <button aria-pressed={scheme.value === 'light'} aria-label="Light" title="Light" onClick={() => scheme.choose('light')}>
+          <SunIcon />
+        </button>
+        <button aria-pressed={scheme.value === 'dark'} aria-label="Dark" title="Dark" onClick={() => scheme.choose('dark')}>
+          <MoonIcon />
+        </button>
+      </div>
+    )}
     {browserHost && (
       <button className="gr-submit" onClick={() => post({ type: 'submit' })}>
         Submit
@@ -161,6 +175,75 @@ const Toolbar = ({
     )}
   </div>
 )
+
+/** SunIcon is the light segment of the scheme pill. */
+const SunIcon = () => (
+  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+    <circle cx="8" cy="8" r="2.25" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    <path
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      d="M8 1.6v1.5M8 12.9v1.5M1.6 8h1.5M12.9 8h1.5M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M12.6 3.4 11.5 4.5M4.5 11.5 3.4 12.6"
+    />
+  </svg>
+)
+
+/** MoonIcon is the dark segment of the scheme pill. */
+const MoonIcon = () => (
+  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+    <path
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinejoin="round"
+      d="M9.4 2.2a5.2 5.2 0 1 0 4.4 7.6A4.3 4.3 0 0 1 9.4 2.2z"
+    />
+  </svg>
+)
+
+/** BrowserScheme is the browser host's palette and the way to change it. */
+interface BrowserScheme {
+  value: ColorScheme
+  choose: (scheme: ColorScheme) => void
+}
+
+/** useBrowserScheme follows the system until the reader picks, and is absent inside the editor. */
+function useBrowserScheme(): BrowserScheme | undefined {
+  const [scheme, setScheme] = useState<ColorScheme>(currentScheme)
+  useEffect(() => {
+    if (browserHost) {
+      applyScheme(scheme)
+    }
+  }, [scheme])
+  useEffect(() => {
+    if (!browserHost) {
+      return
+    }
+    const media = window.matchMedia('(prefers-color-scheme: light)')
+    const apply = () => {
+      if (readScheme() !== undefined) {
+        return
+      }
+      const next: ColorScheme = media.matches ? 'light' : 'dark'
+      applyScheme(next)
+      setScheme(next)
+    }
+    media.addEventListener('change', apply)
+    return () => media.removeEventListener('change', apply)
+  }, [])
+  if (!browserHost) {
+    return undefined
+  }
+  return {
+    value: scheme,
+    choose(next) {
+      storeScheme(next)
+      setScheme(next)
+    },
+  }
+}
 
 /** ChapterSummary is the left column: a chapter heading when the guide has one, then its files. */
 const ChapterSummary = ({
@@ -281,10 +364,14 @@ function motionPreference(): ScrollBehavior {
 }
 
 /** useRefractor loads only the grammars this review's files need, rendering plain until ready. */
-function useRefractor(files: FileData[]): RefractorLike | null {
+function useRefractor(files: FileData[], scheme: ColorScheme | undefined): RefractorLike | null {
   const [refractor, setRefractor] = useState<RefractorLike | null>(null)
   const [theme, setTheme] = useState(activeTheme)
   const paths = files.map(pathOf).join('|')
+
+  useEffect(() => {
+    setTheme(activeTheme())
+  }, [scheme])
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: light)')

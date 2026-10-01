@@ -115,6 +115,12 @@ export function activeTheme(): ThemeName {
   if ([...body].some(name => name.startsWith('vscode-'))) {
     return 'dark-plus'
   }
+  if (body.contains('gr-light')) {
+    return '2026 Light'
+  }
+  if (body.contains('gr-dark')) {
+    return '2026 Dark'
+  }
   return window.matchMedia('(prefers-color-scheme: light)').matches ? '2026 Light' : '2026 Dark'
 }
 
