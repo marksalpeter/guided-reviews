@@ -17,7 +17,7 @@ const usage = `review — open a guided review and wait until it is submitted
   review                                 open the browser and block until Submit
   review comments [--unanswered] [--json]
   review reply <thread-id> -m <message>
-  review install                         install the /review skill for Claude and Cursor
+  review install                         install the /review skill
 
   --harness claude|codex                 headless command that writes the guide
   --model <name>                         model for that command
@@ -55,7 +55,7 @@ async function dispatch(argv: readonly string[], out: Writer, err: Writer, deps:
   if (parsed.command === 'install') {
     const root = await repoRoot()
     await installReviewSkills(root)
-    out.write('installed /review for Claude Code and Cursor\n')
+    out.write('installed /review\n')
     return 0
   }
   if (parsed.command !== undefined && parsed.command !== 'open') {

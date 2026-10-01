@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, mkdir, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { SystemExec } from '../core/exec.js'
 import { Git } from '../core/git.js'
 import { ReviewService } from '../core/review.js'
 import { binMain } from './bin.js'
 import { ReviewHost } from './host.js'
-import { claudeSkillPath, cursorSkillPath } from './skills.js'
+import { claudeSkillDir, reviewSkillDir, reviewSkillPath } from './skills.js'
 
 /** Capture collects CLI output for assertions. */
 class Capture {
@@ -112,13 +112,44 @@ describe('review binary', () => {
     expect(out.text).toContain('Review approved')
   })
 
-  it('installs the /review skill for Claude and Cursor', async () => {
+  it('installs /review in .agents and links it into .claude', async () => {
+    const stale = join(dir, '.cursor/skills/review')
+    await mkdir(stale, { recursive: true })
+    await writeFile(join(stale, 'SKILL.md'), 'stale cursor skill')
+
     expect(await binMain(['install'], out, err)).toBe(0)
-    expect(await readFile(join(dir, claudeSkillPath), 'utf8')).toContain('run_in_background: true')
-    expect(await readFile(join(dir, cursorSkillPath), 'utf8')).toContain('in the foreground')
-    const exclude = await readFile(join(dir, '.git/info/exclude'), 'utf8')
-    expect(exclude).toContain('.claude/skills/review')
-    expect(exclude).toContain('.cursor/skills/review')
+
+    const skill = await readFile(join(dir, reviewSkillPath), 'utf8')
+    expect(skill).toContain('run_in_background: true')
+    expect(skill).toContain('in the foreground')
+    const link = join(dir, claudeSkillDir)
+    expect((await lstat(link)).isSymbolicLink()).toBe(true)
+    expect(await readlink(link)).toBe('../../.agents/skills/review')
+    expect(await readFile(join(link, 'SKILL.md'), 'utf8')).toBe(skill)
+    await expect(lstat(stale)).rejects.toThrow()
+    const lines = (await readFile(join(dir, '.git/info/exclude'), 'utf8')).split('\n').map(line => line.trim())
+    expect(lines.filter(line => line === reviewSkillDir)).toHaveLength(1)
+    expect(lines.filter(line => line === claudeSkillDir)).toHaveLength(1)
+  })
+
+  it('replaces a real directory or a wrong link at the claude skill path', async () => {
+    const link = join(dir, claudeSkillDir)
+    await mkdir(link, { recursive: true })
+    await writeFile(join(link, 'SKILL.md'), 'stale')
+
+    expect(await binMain(['install'], out, err)).toBe(0)
+    expect((await lstat(link)).isSymbolicLink()).toBe(true)
+    expect(await readFile(join(link, 'SKILL.md'), 'utf8')).not.toBe('stale')
+
+    await rm(link, { recursive: true, force: true })
+    await mkdir(dirname(link), { recursive: true })
+    await symlink('../../elsewhere', link, 'dir')
+
+    expect(await binMain(['install'], out, err)).toBe(0)
+    expect(await readlink(link)).toBe('../../.agents/skills/review')
+    const lines = (await readFile(join(dir, '.git/info/exclude'), 'utf8')).split('\n').map(line => line.trim())
+    expect(lines.filter(line => line === reviewSkillDir)).toHaveLength(1)
+    expect(lines.filter(line => line === claudeSkillDir)).toHaveLength(1)
   })
 
   it('still lists comments without waiting', async () => {
