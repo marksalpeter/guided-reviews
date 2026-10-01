@@ -12,7 +12,7 @@ env:
 
 jobs:
   release:
-    name: Build, package and publish the vsix
+    name: Build, package and publish the release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
