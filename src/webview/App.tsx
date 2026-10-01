@@ -283,11 +283,19 @@ function motionPreference(): ScrollBehavior {
 /** useRefractor loads only the grammars this review's files need, rendering plain until ready. */
 function useRefractor(files: FileData[]): RefractorLike | null {
   const [refractor, setRefractor] = useState<RefractorLike | null>(null)
+  const [theme, setTheme] = useState(activeTheme)
   const paths = files.map(pathOf).join('|')
 
   useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: light)')
+    const apply = () => setTheme(activeTheme())
+    media.addEventListener('change', apply)
+    return () => media.removeEventListener('change', apply)
+  }, [])
+
+  useEffect(() => {
     let live = true
-    void loadRefractor(paths ? paths.split('|') : [], activeTheme()).then(loaded => {
+    void loadRefractor(paths ? paths.split('|') : [], theme).then(loaded => {
       if (live) {
         setRefractor(loaded)
       }
@@ -295,7 +303,7 @@ function useRefractor(files: FileData[]): RefractorLike | null {
     return () => {
       live = false
     }
-  }, [paths])
+  }, [paths, theme])
 
   return refractor
 }

@@ -1,7 +1,10 @@
 import { createHighlighterCore, type HighlighterCore } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
+import type { ThemeRegistration } from 'shiki'
 import darkPlus from 'shiki/themes/dark-plus.mjs'
 import lightPlus from 'shiki/themes/light-plus.mjs'
+import vscode2026Dark from './themes/vscode-2026-dark.json'
+import vscode2026Light from './themes/vscode-2026-light.json'
 import { aliasExtensions, grammarLoaders } from './grammars.js'
 
 /** extensionOverrides covers extensions shiki's own aliases do not, and wins over them. */
@@ -103,9 +106,16 @@ function resolveGrammar(name: string | undefined): string {
   return aliased && grammarLoaders[aliased] ? aliased : plaintext
 }
 
-/** activeTheme reads the theme VS Code stamped on the document body. */
+/** activeTheme reads the theme VS Code stamped on the document body, or the 2026 default outside it. */
 export function activeTheme(): ThemeName {
-  return document.body.classList.contains('vscode-light') ? 'light-plus' : 'dark-plus'
+  const body = document.body.classList
+  if (body.contains('vscode-light') || body.contains('vscode-high-contrast-light')) {
+    return 'light-plus'
+  }
+  if ([...body].some(name => name.startsWith('vscode-'))) {
+    return 'dark-plus'
+  }
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? '2026 Light' : '2026 Dark'
 }
 
 /** ensureLanguages loads any grammars the highlighter does not already hold. */
@@ -123,7 +133,7 @@ async function ensureLanguages(languages: readonly string[]): Promise<Highlighte
 /** getHighlighter builds the shared highlighter once, with themes but no grammars. */
 function getHighlighter(): Promise<HighlighterCore> {
   cached ??= createHighlighterCore({
-    themes: [darkPlus, lightPlus],
+    themes: [darkPlus, lightPlus, vscode2026Dark as ThemeRegistration, vscode2026Light as ThemeRegistration],
     langs: [],
     engine: createJavaScriptRegexEngine(),
   })
@@ -155,8 +165,8 @@ function findElement(node: HastNode | undefined, tagName: string): HastNode | un
   return node?.children?.find(child => child.type === 'element' && child.tagName === tagName)
 }
 
-/** ThemeName is one of the two VS Code default themes Shiki ships. */
-export type ThemeName = 'dark-plus' | 'light-plus'
+/** ThemeName is a VS Code default theme. Plus themes follow the editor; 2026 themes are the browser default. */
+export type ThemeName = 'dark-plus' | 'light-plus' | '2026 Dark' | '2026 Light'
 
 /** RefractorLike is the narrow surface react-diff-view calls for syntax highlighting. */
 export interface RefractorLike {

@@ -127,6 +127,12 @@ describe('loadRefractor', () => {
     expect(shim.highlight('anything', plaintext)).toEqual([{ type: 'text', value: 'anything' }])
   })
 
+  it('uses the 2026 dark string color', async () => {
+    const shim = await loadRefractor(['a.ts'], '2026 Dark')
+    const styled = JSON.stringify(shim.highlight('const name = "hi"', 'typescript'))
+    expect(styled.toLowerCase()).toContain('#a5d6ff')
+  })
+
   it('handles an empty source without throwing', async () => {
     const shim = await loadRefractor(['a.ts'], 'dark-plus')
     expect(textOf(shim.highlight('', 'typescript'))).toBe('')
