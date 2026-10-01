@@ -205,6 +205,13 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .gr-modes button { background: transparent; color: var(--vscode-foreground); border-radius: 999px; padding: 5px 14px; }
 .gr-modes button[aria-pressed='true'] { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
 
+/* a pill of its own, the same height as the view toggle, and the last thing in the bar */
+.gr-submit {
+  border-radius: 999px;
+  padding: 7px 16px;
+  border: 1px solid transparent;
+}
+
 .gr-body { display: flex; flex: 1; min-height: 0; }
 .gr-main { flex: 1; min-width: 0; overflow: auto; padding: 0 var(--gr-gutter) 40vh; }
 

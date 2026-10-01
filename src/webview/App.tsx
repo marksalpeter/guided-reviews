@@ -133,7 +133,7 @@ export const App = () => {
   )
 }
 
-/** Toolbar is the sticky header: the ref selectors on the left, the view toggle on the right. */
+/** Toolbar is the sticky header: the ref selectors on the left, the view toggle, then Submit at the far right. */
 const Toolbar = ({
   selector,
   mode,
@@ -146,11 +146,6 @@ const Toolbar = ({
   <div className="gr-toolbar">
     <BranchBar selector={selector} />
     <span className="gr-spacer" />
-    {browserHost && (
-      <button className="gr-submit" onClick={() => post({ type: 'submit' })}>
-        Submit
-      </button>
-    )}
     <div className="gr-modes">
       <button aria-pressed={mode === 'guided'} onClick={() => onMode('guided')}>
         Guided
@@ -159,6 +154,11 @@ const Toolbar = ({
         Diff
       </button>
     </div>
+    {browserHost && (
+      <button className="gr-submit" onClick={() => post({ type: 'submit' })}>
+        Submit
+      </button>
+    )}
   </div>
 )
 
