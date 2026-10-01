@@ -144,9 +144,12 @@ Run \`review\` and wait until the human clicks Submit.
 - **Claude Code:** run it in the background with \`run_in_background: true\`, then wait for that task. Do not poll.
 - **Every other harness:** run it in the foreground and wait until the process exits. Do not background it. A background task in Cursor is polled and spams the chat.
 
-The process opens the review and does not exit until the human clicks Submit. Inside VS Code or Cursor it opens in the editor's embedded browser. Anywhere else it opens in the system browser. Do not open the URL yourself. Stderr prints the URL as soon as it is listening. Relay it:
+The process does not exit until the human clicks Submit. Stderr prints the URL as soon as it is listening. Relay it:
 
 > **"Review is open at <url>. Leave comments, then click Submit."**
+
+- **Inside VS Code or Cursor:** open that URL in the editor's embedded browser. In Cursor that is the Browser tab. In VS Code that is the integrated browser. Do not open an external browser. \`review\` does not open one for you there.
+- **Anywhere else:** \`review\` opens the system browser itself. Do not open the URL yourself.
 
 Do not read the review log. Do not ask the user to type anything.
 

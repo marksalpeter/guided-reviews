@@ -7,7 +7,7 @@ import { detectAgentCommand } from '../core/harness.js'
 import { Git } from '../core/git.js'
 import { SystemExec } from '../core/exec.js'
 import { ReviewService } from '../core/review.js'
-import { browserUri, openCommand } from '../core/uri.js'
+import { openCommand } from '../core/uri.js'
 import { main } from './main.js'
 import { startReviewServer } from './server.js'
 import { installReviewBinary, installReviewSkills, reviewSkillDir, systemBinDir } from './skills.js'
@@ -108,25 +108,19 @@ async function serve(parsed: ParsedArgs, out: Writer, err: Writer, deps: BinDeps
   return 0
 }
 
-/** openReview opens the page in the editor's embedded browser, or the system browser outside one. */
+/** openReview opens the system browser. An editor has its own browser, which the agent opens, so this stays quiet there. */
 async function openReview(
   editor: string | undefined,
   pageUrl: string,
   platform: string,
   launch: (command: string, args: readonly string[]) => Promise<void>,
 ): Promise<void> {
-  const target = editor ? browserUri(editor, pageUrl) : pageUrl
-  const launched = openCommand(platform, target)
-  try {
-    await launch(launched.command, launched.args)
-  } catch {
-    // a missing editor handler should still put the page somewhere the human can see it
-    if (!editor) {
-      return
-    }
-    const fallback = openCommand(platform, pageUrl)
-    await launch(fallback.command, fallback.args).catch(() => undefined)
+  // the editor will not run its browser for an outside process, and the system browser is the wrong window
+  if (editor) {
+    return
   }
+  const launched = openCommand(platform, pageUrl)
+  await launch(launched.command, launched.args).catch(() => undefined)
 }
 
 /** binaryFor is the path override for the preset actually in use. */

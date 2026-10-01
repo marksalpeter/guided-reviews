@@ -112,7 +112,7 @@ describe('review binary', () => {
     expect(out.text).toContain('Review approved')
   })
 
-  it('opens the editor browser when launched from Cursor or VS Code', async () => {
+  it('leaves the browser to the editor when launched from Cursor or VS Code', async () => {
     const opened: string[] = []
     const pending = binMain([], out, err, {
       runner: failingRunner,
@@ -123,14 +123,13 @@ describe('review binary', () => {
       },
     })
     const url = await waitForUrl(err)
-    await waitFor(() => opened.length > 0)
-    expect(opened).toEqual([`cursor://marksalpeter.guided-reviews/browser?url=${encodeURIComponent(url)}`])
     await fetch(`${url}api/message`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ type: 'submit' }),
     })
     expect(await pending).toBe(0)
+    expect(opened).toEqual([])
   })
 
   it('opens the system browser outside an editor', async () => {
@@ -163,6 +162,7 @@ describe('review binary', () => {
     expect(skill).toContain('run_in_background: true')
     expect(skill).toContain('in the foreground')
     expect(skill).toContain("editor's embedded browser")
+    expect(skill).toContain('Browser tab')
     const link = join(home, claudeSkillDir)
     expect((await lstat(link)).isSymbolicLink()).toBe(true)
     expect(await readlink(link)).toBe('../../.agents/skills/review')
