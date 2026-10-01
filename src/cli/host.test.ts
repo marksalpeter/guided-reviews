@@ -112,6 +112,48 @@ describe('review binary', () => {
     expect(out.text).toContain('Review approved')
   })
 
+  it('opens the editor browser when launched from Cursor or VS Code', async () => {
+    const opened: string[] = []
+    const pending = binMain([], out, err, {
+      runner: failingRunner,
+      env: { CURSOR_AGENT: '1', TERM_PROGRAM: 'vscode' },
+      platform: 'darwin',
+      launch: async (_command, args) => {
+        opened.push(args[0] ?? '')
+      },
+    })
+    const url = await waitForUrl(err)
+    await waitFor(() => opened.length > 0)
+    expect(opened).toEqual([`cursor://marksalpeter.guided-reviews/browser?url=${encodeURIComponent(url)}`])
+    await fetch(`${url}api/message`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'submit' }),
+    })
+    expect(await pending).toBe(0)
+  })
+
+  it('opens the system browser outside an editor', async () => {
+    const opened: string[] = []
+    const pending = binMain([], out, err, {
+      runner: failingRunner,
+      env: {},
+      platform: 'linux',
+      launch: async (_command, args) => {
+        opened.push(args[0] ?? '')
+      },
+    })
+    const url = await waitForUrl(err)
+    await waitFor(() => opened.length > 0)
+    expect(opened).toEqual([url])
+    await fetch(`${url}api/message`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'submit' }),
+    })
+    expect(await pending).toBe(0)
+  })
+
   it('installs /review under the home directory and links it into ~/.claude', async () => {
     const home = join(dir, 'home')
     const installed = await binMain(['install'], out, err, { homeDir: home, env: { PATH: '/usr/bin' } })
@@ -120,6 +162,7 @@ describe('review binary', () => {
     const skill = await readFile(join(home, reviewSkillPath), 'utf8')
     expect(skill).toContain('run_in_background: true')
     expect(skill).toContain('in the foreground')
+    expect(skill).toContain("editor's embedded browser")
     const link = join(home, claudeSkillDir)
     expect((await lstat(link)).isSymbolicLink()).toBe(true)
     expect(await readlink(link)).toBe('../../.agents/skills/review')
@@ -200,6 +243,17 @@ describe('review binary', () => {
     expect(err.text).toContain('No review has been opened')
   })
 })
+
+/** waitFor polls until a condition holds, for a step that follows the printed URL. */
+async function waitFor(ready: () => boolean): Promise<void> {
+  for (let i = 0; i < 50; i++) {
+    if (ready()) {
+      return
+    }
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  throw new Error('timed out waiting')
+}
 
 /** waitForUrl polls stderr until the server prints its address. */
 async function waitForUrl(err: Capture): Promise<string> {

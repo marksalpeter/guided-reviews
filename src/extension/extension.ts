@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import { Git } from '../core/git.js'
 import { ReviewService } from '../core/review.js'
+import { reviewPageUrl } from '../core/uri.js'
 import { installAgentSupport } from './agentSupport.js'
 import { repoRootOfStub, threadIdOf } from '../core/threadLinks.js'
 import { ReviewPanel, viewType } from './reviewPanel.js'
@@ -26,6 +27,8 @@ export function activate(context: vscode.ExtensionContext): void {
       handleUri: uri => {
         if (uri.path === '/review') {
           void openFromUri(uri, root)
+        } else if (uri.path === '/browser') {
+          void openEmbedded(uri)
         }
       },
     }),
@@ -120,6 +123,24 @@ async function openReview(service: ReviewService, root: vscode.Uri, focusThread?
   const panel = ReviewPanel.show(service, await service.defaultSelection(), root)
   if (focusThread) {
     await panel.focus(focusThread)
+  }
+}
+
+/** openEmbedded shows the review page in the editor's browser, not an external one. */
+async function openEmbedded(uri: vscode.Uri): Promise<void> {
+  const page = reviewPageUrl(new URLSearchParams(uri.query).get('url') ?? '')
+  if (!page) {
+    return
+  }
+  try {
+    // simpleBrowser.show uses the integrated browser when the editor has one, and its own tab otherwise
+    await vscode.commands.executeCommand('simpleBrowser.show', page)
+  } catch (error) {
+    try {
+      await vscode.commands.executeCommand('workbench.action.browser.open', page)
+    } catch {
+      void vscode.window.showErrorMessage(`Guided Reviews: could not open the review in the editor. ${messageOf(error)}`)
+    }
   }
 }
 

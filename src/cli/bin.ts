@@ -2,11 +2,12 @@ import { dirname, join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { AgentRunner, type AgentCommand, type GuideRunner } from '../core/guide.js'
+import { detectEditor } from '../core/editor.js'
 import { detectAgentCommand } from '../core/harness.js'
 import { Git } from '../core/git.js'
 import { SystemExec } from '../core/exec.js'
 import { ReviewService } from '../core/review.js'
-import { openCommand } from '../core/uri.js'
+import { browserUri, openCommand } from '../core/uri.js'
 import { main } from './main.js'
 import { startReviewServer } from './server.js'
 import { installReviewBinary, installReviewSkills, reviewSkillDir, systemBinDir } from './skills.js'
@@ -95,14 +96,37 @@ async function serve(parsed: ParsedArgs, out: Writer, err: Writer, deps: BinDeps
   })
   err.write(`Review is open at ${running.url}. Leave comments, then click Submit.\n`)
   if (!parsed.noOpen && !deps.noOpen) {
-    const { command: open, args } = openCommand(process.platform, running.url)
-    await new SystemExec(root).run(open, args).catch(() => undefined)
+    const env = deps.env ?? process.env
+    const platform = deps.platform ?? process.platform
+    const launch = deps.launch ?? ((command: string, args: readonly string[]) => new SystemExec(root).run(command, args).then(() => undefined))
+    await openReview(detectEditor(env), running.url, platform, launch)
   }
   const result = await running.submitted
   await running.close()
   err.write(`approved: ${result.approved}\n`)
   out.write(`${result.text}\n`)
   return 0
+}
+
+/** openReview opens the page in the editor's embedded browser, or the system browser outside one. */
+async function openReview(
+  editor: string | undefined,
+  pageUrl: string,
+  platform: string,
+  launch: (command: string, args: readonly string[]) => Promise<void>,
+): Promise<void> {
+  const target = editor ? browserUri(editor, pageUrl) : pageUrl
+  const launched = openCommand(platform, target)
+  try {
+    await launch(launched.command, launched.args)
+  } catch {
+    // a missing editor handler should still put the page somewhere the human can see it
+    if (!editor) {
+      return
+    }
+    const fallback = openCommand(platform, pageUrl)
+    await launch(fallback.command, fallback.args).catch(() => undefined)
+  }
 }
 
 /** binaryFor is the path override for the preset actually in use. */
@@ -177,6 +201,7 @@ export interface BinDeps {
   execPath?: string
   platform?: string
   env?: NodeJS.ProcessEnv
+  launch?: (command: string, args: readonly string[]) => Promise<void>
 }
 
 if (require.main === module) {

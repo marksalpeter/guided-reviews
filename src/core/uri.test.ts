@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extensionId, openCommand, reviewUri } from './uri.js'
+import { browserUri, extensionId, openCommand, reviewPageUrl, reviewUri } from './uri.js'
 
 describe('review uri', () => {
   it('addresses the extension under the editor own scheme', () => {
@@ -12,6 +12,20 @@ describe('review uri', () => {
 
   it('encodes a repository path containing spaces', () => {
     expect(reviewUri('vscode', '/a b/repo')).toContain('repo=%2Fa%20b%2Frepo')
+  })
+
+  it('asks the editor to open the review page in its embedded browser', () => {
+    expect(browserUri('cursor', 'http://127.0.0.1:9/')).toBe(
+      `cursor://${extensionId}/browser?url=${encodeURIComponent('http://127.0.0.1:9/')}`,
+    )
+  })
+
+  it('accepts only a review page on this machine', () => {
+    expect(reviewPageUrl('http://127.0.0.1:4317/')).toBe('http://127.0.0.1:4317/')
+    expect(reviewPageUrl('http://localhost:4317/review')).toBe('http://localhost:4317/review')
+    expect(reviewPageUrl('https://example.com/')).toBeUndefined()
+    expect(reviewPageUrl('file:///etc/passwd')).toBeUndefined()
+    expect(reviewPageUrl('not a url')).toBeUndefined()
   })
 
   it('opens through the platform handler', () => {
