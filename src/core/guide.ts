@@ -4,6 +4,9 @@ import type { ChangedFile, GuideGroup } from './types.js'
 /** otherChangesTitle names the group that holds files the model left unassigned. */
 const otherChangesTitle = 'Other changes'
 
+/** describeParallelism is how many one-sentence batches run at once. */
+const describeParallelism = 8
+
 /** describeSystemPrompt asks what each file's edit does, with no grouping to bias the answer. */
 const describeSystemPrompt = [
   'You read a git diff and say what each changed file does.',
@@ -34,8 +37,11 @@ export class GuideGenerator {
   /** generate describes each file, groups those descriptions, then repairs whatever came back. */
   async generate(files: readonly ChangedFile[], diff: string): Promise<GuideGroup[]> {
     // two passes: describing and grouping in one call makes the model partition by path, not by purpose
-    const described = await this.runner.run(buildDescribePrompt(files), diff, describeSystemPrompt)
-    const notes = parseDescriptions(described, files.map(f => f.path))
+    const batches = describeBatches(files)
+    const described = await Promise.all(
+      batches.map(batch => this.runner.run(buildDescribePrompt(batch), diffForFiles(diff, batch.map(file => file.path)), describeSystemPrompt)),
+    )
+    const notes = batches.flatMap((batch, index) => parseDescriptions(described[index] ?? '', batch.map(file => file.path)))
     if (notes.length === 0) {
       throw new Error('the guided review could not describe any changed file')
     }
@@ -162,6 +168,64 @@ export interface AgentLaunch {
   args: string[]
   input: string
   env: NodeJS.ProcessEnv
+}
+
+/** describeBatches splits the files across min(count, 8) summarizers, as evenly as the count allows. */
+export function describeBatches(files: readonly ChangedFile[]): ChangedFile[][] {
+  const batches = Math.min(files.length, describeParallelism)
+  if (batches === 0) {
+    return []
+  }
+  const base = Math.floor(files.length / batches)
+  let extra = files.length % batches
+  const groups: ChangedFile[][] = []
+  let index = 0
+  for (let i = 0; i < batches; i++) {
+    const size = base + (extra > 0 ? 1 : 0)
+    extra = Math.max(0, extra - 1)
+    groups.push(files.slice(index, index + size))
+    index += size
+  }
+  return groups
+}
+
+/** diffForFiles is the patch slice for one batch. A diff with no file headers is returned whole. */
+export function diffForFiles(diff: string, paths: readonly string[]): string {
+  const sections = sectionsByPath(diff)
+  if (sections.size === 0) {
+    return diff
+  }
+  const sliced = paths.map(path => sections.get(path) ?? '').filter(part => part.length > 0).join('')
+  return sliced.length > 0 ? sliced : diff
+}
+
+/** sectionsByPath splits a unified diff on `diff --git` headers, keyed by the new path. */
+function sectionsByPath(diff: string): Map<string, string> {
+  const sections = new Map<string, string>()
+  if (!diff.includes('diff --git ')) {
+    return sections
+  }
+  for (const part of diff.split(/^(?=diff --git )/m)) {
+    if (!part.startsWith('diff --git ')) {
+      continue
+    }
+    const newline = part.indexOf('\n')
+    const path = newPath(newline === -1 ? part : part.slice(0, newline))
+    if (path) {
+      sections.set(path, (sections.get(path) ?? '') + part)
+    }
+  }
+  return sections
+}
+
+/** newPath reads the b/ path from a `diff --git` header, including a quoted one. */
+function newPath(header: string): string {
+  const quoted = header.match(/^diff --git "a\/.*" "b\/(.*)"$/)
+  if (quoted?.[1]) {
+    return quoted[1].replace(/\\"/g, '"')
+  }
+  const plain = header.match(/^diff --git a\/.* b\/(.*)$/)
+  return plain?.[1] ?? ''
 }
 
 /** buildDescribePrompt states the exact set of paths the model must describe. */

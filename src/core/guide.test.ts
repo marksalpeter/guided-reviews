@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { GuideGenerator, buildDescribePrompt, buildGroupPrompt, parseDescriptions, parseGuideResponse, repairGroups } from './guide.js'
+import { GuideGenerator, buildDescribePrompt, buildGroupPrompt, describeBatches, diffForFiles, parseDescriptions, parseGuideResponse, repairGroups } from './guide.js'
 import type { ChangedFile } from './types.js'
 
 const file = (path: string): ChangedFile => ({
@@ -10,6 +10,17 @@ const file = (path: string): ChangedFile => ({
   additions: 1,
   deletions: 1,
   binary: false,
+})
+
+describe('diffForFiles', () => {
+  it('returns a headerless diff unchanged', () => {
+    expect(diffForFiles('not a patch', ['a.ts'])).toBe('not a patch')
+  })
+
+  it('reads a quoted new path', () => {
+    const diff = 'diff --git "a/my file.ts" "b/my file.ts"\n+line\n'
+    expect(diffForFiles(diff, ['my file.ts'])).toBe(diff)
+  })
 })
 
 describe('parseGuideResponse', () => {
@@ -159,15 +170,14 @@ describe('parseDescriptions', () => {
 })
 
 describe('GuideGenerator', () => {
-  /** twoPass answers the description pass from the paths, then the grouping pass verbatim. */
+  /** twoPass answers every description batch from the paths, then the grouping pass verbatim. */
   const twoPass = (grouping: string, paths: readonly string[] = ['a.ts']) => {
-    let call = 0
     return {
-      run: async () => {
-        call += 1
-        return call === 1
-          ? JSON.stringify({ result: JSON.stringify({ files: paths.map(path => ({ path, does: 'does something' })) }) })
-          : grouping
+      run: async (prompt: string) => {
+        if (prompt.startsWith('Describe')) {
+          return JSON.stringify({ result: JSON.stringify({ files: paths.map(path => ({ path, does: 'does something' })) }) })
+        }
+        return grouping
       },
     }
   }
@@ -230,6 +240,40 @@ describe('GuideGenerator', () => {
     }
     await new GuideGenerator(runner).generate([file('a.ts')], diff)
     expect(received).toContain(diff)
+  })
+
+  it('describes files in parallel batches of at most eight, and only sends each batch its own patch', async () => {
+    const files = Array.from({ length: 10 }, (_, index) => file(`f${index}.ts`))
+    const diff = files.map(entry => `diff --git a/${entry.path} b/${entry.path}\n--- a/${entry.path}\n+++ b/${entry.path}\n@@ -1 +1 @@\n-old\n+${entry.path}\n`).join('')
+    let inFlight = 0
+    let maxInFlight = 0
+    const describeStdins: string[] = []
+    const runner = {
+      run: async (prompt: string, stdin: string) => {
+        if (!prompt.startsWith('Describe')) {
+          return JSON.stringify({ result: '{"groups":[{"title":"C","summary":"s","files":["f0.ts"]}]}' })
+        }
+        inFlight += 1
+        maxInFlight = Math.max(maxInFlight, inFlight)
+        await new Promise(resolve => setTimeout(resolve, 5))
+        inFlight -= 1
+        describeStdins.push(stdin)
+        const paths = [...prompt.matchAll(/^- (f\d+\.ts) /gm)].map(match => match[1] ?? '')
+        return JSON.stringify({ result: JSON.stringify({ files: paths.map(path => ({ path, does: 'does something' })) }) })
+      },
+    }
+
+    await new GuideGenerator(runner).generate(files, diff)
+
+    expect(describeBatches(files)).toHaveLength(8)
+    expect(describeBatches(files).map(batch => batch.length)).toEqual([2, 2, 1, 1, 1, 1, 1, 1])
+    expect(maxInFlight).toBe(8)
+    expect(describeStdins).toHaveLength(8)
+    const first = describeStdins.find(stdin => stdin.includes('diff --git a/f0.ts'))
+    expect(first).toContain('diff --git a/f1.ts')
+    expect(first).not.toContain('diff --git a/f2.ts')
+    const last = describeStdins.find(stdin => stdin.includes('diff --git a/f9.ts'))
+    expect(last).not.toContain('diff --git a/f0.ts')
   })
 
   it('keeps the diff out of the grouping pass', async () => {
