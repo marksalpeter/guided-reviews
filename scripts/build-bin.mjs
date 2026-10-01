@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs'
 import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { join, relative } from 'node:path'
 
 const root = process.cwd()
@@ -53,7 +55,20 @@ for (const job of jobs) {
   if (job.target) {
     args.push(`--target=${job.target}`)
   }
-  await run(process.env.BUN ?? 'bun', args)
+  await run(bunCommand(), args)
+}
+
+/** bunCommand is the local devDependency, unless BUN points somewhere else. */
+function bunCommand() {
+  if (process.env.BUN) return process.env.BUN
+  try {
+    const require = createRequire(import.meta.url)
+    const pkgPath = require.resolve('bun/package.json')
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+    return join(pkgPath, '..', pkg.bin.bun)
+  } catch (error) {
+    throw new Error('bun is not installed. Run npm install in this repo.', { cause: error })
+  }
 }
 
 /** walk lists every file under a directory. */

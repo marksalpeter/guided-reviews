@@ -72,7 +72,10 @@ never shown to it again. Comment on a resolved thread to reopen it.
 ```sh
 npm install
 npm run dev:install      # builds, packages, and installs the VSIX with --force
+npm run build:bin        # compiles the standalone review binary to dist/review
 ```
+
+Bun is installed with the other devDependencies, so `npm install` is enough for `build:bin`.
 
 Run **Developer: Reload Window** afterwards so the editor picks up the new build.
 

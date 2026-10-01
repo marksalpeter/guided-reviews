@@ -39,8 +39,6 @@ jobs:
       - name: Package the extension
         run: npx vsce package --out guided-reviews-pr.vsix
 
-      - uses: oven-sh/setup-bun@v2
-
       # one linux runner cross-compiles every release binary; only linux-x64 can be executed here
       - run: node scripts/build-bin.mjs --all
       - run: ./dist/binaries/review-linux-x64 --help

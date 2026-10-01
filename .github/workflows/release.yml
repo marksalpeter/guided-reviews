@@ -42,8 +42,6 @@ jobs:
 
       - run: npm run build
 
-      - uses: oven-sh/setup-bun@v2
-
       - run: node scripts/build-bin.mjs --all
 
       - name: Package the extension
