@@ -141,12 +141,13 @@ npx vitest run -c vitest.e2e.config.ts   # full stack against the real claude bi
 Two workflows in `.github/workflows`:
 
 - **CI** runs on every pull request and on `main`: lint, typecheck, the full test
-  suite, a build, and a real `vsce package`. The packaged vsix is uploaded as a build
-  artifact, so a reviewer can install the exact bits a PR produces.
+  suite, a build, and a real `vsce package`. It also cross-compiles the `review` binary
+  for Linux, macOS, and Windows (x64 and arm64). The vsix and those binaries are uploaded
+  as build artifacts, so a reviewer can install the exact bits a PR produces.
 - **Release** runs on any `v*` tag. It re-runs every check, packages the extension, and
-  publishes a GitHub release with the vsix attached. It refuses to publish when the tag
-  and `package.json` version disagree, and a tag carrying a suffix (`v0.2.0-beta.1`)
-  publishes as a pre-release.
+  publishes a GitHub release with the vsix and the same six `review` binaries attached.
+  It refuses to publish when the tag and `package.json` version disagree, and a tag
+  carrying a suffix (`v0.2.0-beta.1`) publishes as a pre-release.
 
 ```sh
 npm version minor        # bump package.json and tag

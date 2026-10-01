@@ -1,4 +1,4 @@
-import { readdir, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { join, relative } from 'node:path'
 
@@ -34,7 +34,27 @@ await writeFile(
   ].join('\n'),
 )
 
-await run(process.env.BUN ?? 'bun', ['build', entry, '--compile', '--outfile', join(root, 'dist/review')])
+const releaseTargets = [
+  ['bun-linux-x64', 'review-linux-x64'],
+  ['bun-linux-arm64', 'review-linux-arm64'],
+  ['bun-darwin-x64', 'review-macos-x64'],
+  ['bun-darwin-arm64', 'review-macos-arm64'],
+  ['bun-windows-x64', 'review-windows-x64.exe'],
+  ['bun-windows-arm64', 'review-windows-arm64.exe'],
+]
+
+const jobs = process.argv.includes('--all')
+  ? releaseTargets.map(([target, name]) => ({ target, outfile: join(root, 'dist/binaries', name) }))
+  : [{ outfile: join(root, 'dist/review') }]
+
+await mkdir(join(root, 'dist/binaries'), { recursive: true })
+for (const job of jobs) {
+  const args = ['build', entry, '--compile', '--outfile', job.outfile]
+  if (job.target) {
+    args.push(`--target=${job.target}`)
+  }
+  await run(process.env.BUN ?? 'bun', args)
+}
 
 /** walk lists every file under a directory. */
 async function walk(dir) {

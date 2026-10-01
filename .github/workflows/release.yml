@@ -42,6 +42,10 @@ jobs:
 
       - run: npm run build
 
+      - uses: oven-sh/setup-bun@v2
+
+      - run: node scripts/build-bin.mjs --all
+
       - name: Package the extension
         run: npx vsce package --out "$VSIX"
 
@@ -52,7 +56,7 @@ jobs:
           flags=(--title "$GITHUB_REF_NAME" --generate-notes)
           # a tag like v0.2.0-beta.1 publishes as a pre-release
           case "$GITHUB_REF_NAME" in *-*) flags+=(--prerelease) ;; esac
-          gh release create "$GITHUB_REF_NAME" "$VSIX" "${flags[@]}"
+          gh release create "$GITHUB_REF_NAME" "$VSIX" dist/binaries/* "${flags[@]}"
 
       - uses: actions/upload-artifact@v4
         with:

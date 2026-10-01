@@ -41,9 +41,9 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
-      # the webview build above is embedded into the single review binary
-      - run: node scripts/build-bin.mjs
-      - run: ./dist/review --help
+      # one linux runner cross-compiles every release binary; only linux-x64 can be executed here
+      - run: node scripts/build-bin.mjs --all
+      - run: ./dist/binaries/review-linux-x64 --help
 
       - uses: actions/upload-artifact@v4
         with:
@@ -54,7 +54,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: review-binary
-          path: dist/review
+          name: review-binaries
+          path: dist/binaries/*
           if-no-files-found: error
           retention-days: 14
