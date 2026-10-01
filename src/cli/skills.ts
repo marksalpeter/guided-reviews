@@ -43,7 +43,8 @@ export async function installReviewBinary(execPath: string, options: BinaryInsta
   const resolved = await realpath(execPath).catch(() => execPath)
   const from = dirname(resolved)
   const binRoot = await realpath(options.binDir).catch(() => options.binDir)
-  if (from === binRoot || pathIncludes(from, platform, env)) {
+  // Homebrew's prefix bin is already on PATH; copying that binary to /usr/local/bin would duplicate it.
+  if (from === binRoot || pathIncludes(from, platform, env) || homebrewManaged(execPath) || homebrewManaged(resolved)) {
     return { status: 'present', path: resolved }
   }
   const dest = join(options.binDir, base.endsWith('.exe') ? 'review.exe' : 'review')
@@ -100,6 +101,11 @@ async function linksTo(path: string, target: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/** homebrewManaged reports whether Homebrew itself owns this binary. */
+function homebrewManaged(filePath: string): boolean {
+  return filePath.split(/[\\/]+/).some(part => part === 'Cellar' || part === 'homebrew' || part.includes('linuxbrew'))
 }
 
 /** pathIncludes reports whether dir is an entry of PATH. */

@@ -163,6 +163,25 @@ describe('review binary', () => {
     expect(out.text).toContain(`add ${binDir} to PATH`)
   })
 
+  it('does not copy a Homebrew binary into the system bin directory', async () => {
+    const home = join(dir, 'home')
+    const execPath = join(dir, 'opt', 'homebrew', 'Cellar', 'review', 'HEAD', 'bin', 'review')
+    await mkdir(dirname(execPath), { recursive: true })
+    await writeFile(execPath, 'brewed')
+
+    expect(await binMain(['install'], out, err, {
+      homeDir: home,
+      binDir: join(dir, 'usr-local-bin'),
+      execPath,
+      platform: 'linux',
+      env: { PATH: '/usr/bin' },
+    })).toBe(0)
+
+    expect(out.text).toContain('review is already installed at')
+    expect(await readFile(join(home, reviewSkillPath), 'utf8')).toContain('run_in_background: true')
+    await expect(lstat(join(dir, 'usr-local-bin', 'review'))).rejects.toThrow()
+  })
+
   it('leaves a binary that is already on PATH where it is', async () => {
     const home = join(dir, 'home')
     const binDir = join(dir, 'bin')

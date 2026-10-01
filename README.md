@@ -86,17 +86,12 @@ Windows) when the binary is not already on `PATH`. If that directory is not writ
 sudo cp dist/review /usr/local/bin/review
 ```
 
-Homebrew installs the same binary into Homebrew's bin. Until the first GitHub release,
-the formula builds from source:
-
 ```sh
-brew tap marksalpeter/guided-reviews https://github.com/marksalpeter/guided-reviews
-brew install --HEAD marksalpeter/guided-reviews/review
-review install
+brew install review
 ```
 
-After a release, drop `--HEAD`. `review install` then only writes the skill, because
-the binary is already on `PATH`.
+That name is free. It puts the binary on your `PATH` and writes the skill to
+`~/.agents/skills/review`, with `~/.claude/skills/review` linked at it.
 
 Run **Developer: Reload Window** afterwards so the editor picks up the new build.
 
@@ -170,8 +165,8 @@ Two workflows in `.github/workflows`:
   as build artifacts, so a reviewer can install the exact bits a PR produces.
 - **Release** runs on any `v*` tag. It re-runs every check, packages the extension, and
   publishes a GitHub release with the vsix and the same six `review` binaries attached.
-  It then updates `Formula/review.rb` on `main` so `brew install marksalpeter/guided-reviews/review`
-  downloads those binaries. It refuses to publish when the tag and `package.json` version
+  It then updates `Formula/review.rb` on `main` so `brew install review` downloads
+  those binaries and installs the skill under `~`. It refuses to publish when the tag and `package.json` version
   disagree, and a tag carrying a suffix (`v0.2.0-beta.1`) publishes as a pre-release.
 
 ```sh

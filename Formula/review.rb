@@ -13,6 +13,11 @@ class Review < Formula
     bin.install "dist/review"
   end
 
+  def post_install
+    # binary is already in Homebrew's bin, which is on PATH; install only writes the skills
+    system bin/"review", "install"
+  end
+
   test do
     assert_match "Submit", shell_output("#{bin}/review --help")
   end

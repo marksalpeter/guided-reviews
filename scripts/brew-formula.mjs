@@ -13,7 +13,12 @@ const header = `class Review < Formula
   license "MIT"
 `
 
-const test = `
+const finish = `
+  def post_install
+    # binary is already in Homebrew's bin, which is on PATH; install only writes the skills
+    system bin/"review", "install"
+  end
+
   test do
     assert_match "Submit", shell_output("#{bin}/review --help")
   end
@@ -35,7 +40,7 @@ function headOnly() {
     system "npm", "run", "build:bin"
     bin.install "dist/review"
   end
-${test}`
+${finish}`
 }
 
 /** stable points each platform at the release binary and keeps a source build for --HEAD. */
@@ -91,7 +96,7 @@ ${block('review-linux-x64')}
       bin.install "review-linux-x64" => "review"
     end
   end
-${test}`
+${finish}`
 }
 
 /** flag reads one --name value from the command line. */
