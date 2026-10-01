@@ -1,6 +1,6 @@
-import { lstat, mkdir, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
-import { dirname, join, relative } from 'node:path'
-import { SystemExec } from '../core/exec.js'
+import { chmod, copyFile, lstat, mkdir, readlink, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, relative } from 'node:path'
+import { homedir } from 'node:os'
 
 /** reviewSkillDir is the Agent Skills directory. Every harness reads it except Claude Code. */
 export const reviewSkillDir = '.agents/skills/review'
@@ -11,27 +11,73 @@ export const reviewSkillPath = `${reviewSkillDir}/SKILL.md`
 /** claudeSkillDir is Claude Code's copy. Claude does not read .agents, so this links at the real skill. */
 export const claudeSkillDir = '.claude/skills/review'
 
-/** installReviewSkills writes /review once and hides both paths from this clone's git status. */
-export async function installReviewSkills(repoRoot: string): Promise<void> {
-  await writeSkill(repoRoot)
-  await linkClaudeSkill(repoRoot)
-  // an older install wrote a separate Cursor skill; Cursor reads .agents, so that copy would disagree
-  await rm(join(repoRoot, '.cursor/skills/review'), { recursive: true, force: true })
-  const gitCommonDir = (await new SystemExec(repoRoot).run('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'])).trim()
-  await excludeFromGit(gitCommonDir, reviewSkillDir)
-  await excludeFromGit(gitCommonDir, claudeSkillDir)
+/** systemBinDir is where the operating system expects a locally installed command. */
+export function systemBinDir(platform: string = process.platform, env: NodeJS.ProcessEnv = process.env): string {
+  if (platform === 'win32') {
+    const local = env.LOCALAPPDATA || join(env.USERPROFILE || homedir(), 'AppData', 'Local')
+    return join(local, 'Programs', 'review')
+  }
+  return '/usr/local/bin'
 }
 
-/** writeSkill puts the one skill document in the standard directory. */
-async function writeSkill(repoRoot: string): Promise<void> {
-  const target = join(repoRoot, reviewSkillPath)
+/** installReviewSkills writes /review under the home directory. */
+export async function installReviewSkills(homeDir: string): Promise<void> {
+  await writeSkill(homeDir)
+  await linkClaudeSkill(homeDir)
+}
+
+/** BinaryInstall is the result of putting the compiled binary on disk. */
+export type BinaryInstall =
+  | { status: 'skipped' }
+  | { status: 'present'; path: string }
+  | { status: 'installed'; path: string; onPath: boolean }
+
+/** installReviewBinary copies a compiled review binary into binDir, unless it is already on PATH. */
+export async function installReviewBinary(execPath: string, options: BinaryInstallOptions): Promise<BinaryInstall> {
+  const platform = options.platform ?? process.platform
+  const env = options.env ?? process.env
+  const base = basename(execPath).toLowerCase()
+  if (base !== 'review' && base !== 'review.exe') {
+    return { status: 'skipped' }
+  }
+  const resolved = await realpath(execPath).catch(() => execPath)
+  const from = dirname(resolved)
+  const binRoot = await realpath(options.binDir).catch(() => options.binDir)
+  if (from === binRoot || pathIncludes(from, platform, env)) {
+    return { status: 'present', path: resolved }
+  }
+  const dest = join(options.binDir, base.endsWith('.exe') ? 'review.exe' : 'review')
+  await mkdir(options.binDir, { recursive: true })
+  try {
+    await copyFile(execPath, dest)
+    await chmod(dest, 0o755)
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? String((error as { code?: unknown }).code) : ''
+    if (code === 'EACCES' || code === 'EPERM') {
+      throw new Error(`cannot write ${dest}\nsudo cp ${quote(execPath)} ${quote(dest)}`)
+    }
+    throw error
+  }
+  return { status: 'installed', path: dest, onPath: pathIncludes(options.binDir, platform, env) }
+}
+
+/** BinaryInstallOptions choose the destination and how PATH is judged. */
+export interface BinaryInstallOptions {
+  binDir: string
+  platform?: string
+  env?: NodeJS.ProcessEnv
+}
+
+/** writeSkill puts the one skill document in the home directory. */
+async function writeSkill(homeDir: string): Promise<void> {
+  const target = join(homeDir, reviewSkillPath)
   await mkdir(dirname(target), { recursive: true })
   await writeFile(target, reviewSkill)
 }
 
 /** linkClaudeSkill points Claude Code's skill directory at the real skill, copying it where symlinks are refused. */
-async function linkClaudeSkill(repoRoot: string): Promise<void> {
-  const link = join(repoRoot, claudeSkillDir)
+async function linkClaudeSkill(homeDir: string): Promise<void> {
+  const link = join(homeDir, claudeSkillDir)
   const target = relative(dirname(claudeSkillDir), reviewSkillDir)
   if (await linksTo(link, target)) {
     return
@@ -56,16 +102,22 @@ async function linksTo(path: string, target: string): Promise<boolean> {
   }
 }
 
-/** excludeFromGit appends a path to this clone's private ignore list, idempotently. */
-async function excludeFromGit(gitCommonDir: string, path: string): Promise<void> {
-  const target = join(gitCommonDir, 'info', 'exclude')
-  await mkdir(dirname(target), { recursive: true })
-  const existing = await readFile(target, 'utf8').catch(() => '')
-  if (existing.split('\n').some(line => line.trim() === path)) {
-    return
-  }
-  const separator = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
-  await writeFile(target, `${existing}${separator}${path}\n`)
+/** pathIncludes reports whether dir is an entry of PATH. */
+function pathIncludes(dir: string, platform: string, env: NodeJS.ProcessEnv): boolean {
+  const sep = platform === 'win32' ? ';' : ':'
+  const target = strip(dir)
+  const path = env.PATH ?? env.Path ?? ''
+  return path.split(sep).some(entry => strip(entry) === target)
+}
+
+/** strip drops a trailing slash so equivalent directories compare equal. */
+function strip(path: string): string {
+  return path.replace(/[\\/]+$/, '')
+}
+
+/** quote wraps a path for the sudo command printed when the bin directory is not writable. */
+function quote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
 const reviewSkill = `---

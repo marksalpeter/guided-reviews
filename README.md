@@ -73,9 +73,30 @@ never shown to it again. Comment on a resolved thread to reopen it.
 npm install
 npm run dev:install      # builds, packages, and installs the VSIX with --force
 npm run build:bin        # compiles the standalone review binary to dist/review
+./dist/review install    # ~/.agents/skills, ~/.claude/skills, and /usr/local/bin/review
 ```
 
 Bun is installed with the other devDependencies, so `npm install` is enough for `build:bin`.
+`review install` writes the `/review` skill to `~/.agents/skills/review` and links
+`~/.claude/skills/review` at it, because Claude Code does not read `.agents`. It also
+copies the compiled binary to `/usr/local/bin` (or `%LOCALAPPDATA%\Programs\review` on
+Windows) when the binary is not already on `PATH`. If that directory is not writable:
+
+```sh
+sudo cp dist/review /usr/local/bin/review
+```
+
+Homebrew installs the same binary into Homebrew's bin. Until the first GitHub release,
+the formula builds from source:
+
+```sh
+brew tap marksalpeter/guided-reviews https://github.com/marksalpeter/guided-reviews
+brew install --HEAD marksalpeter/guided-reviews/review
+review install
+```
+
+After a release, drop `--HEAD`. `review install` then only writes the skill, because
+the binary is already on `PATH`.
 
 Run **Developer: Reload Window** afterwards so the editor picks up the new build.
 
@@ -149,8 +170,9 @@ Two workflows in `.github/workflows`:
   as build artifacts, so a reviewer can install the exact bits a PR produces.
 - **Release** runs on any `v*` tag. It re-runs every check, packages the extension, and
   publishes a GitHub release with the vsix and the same six `review` binaries attached.
-  It refuses to publish when the tag and `package.json` version disagree, and a tag
-  carrying a suffix (`v0.2.0-beta.1`) publishes as a pre-release.
+  It then updates `Formula/review.rb` on `main` so `brew install marksalpeter/guided-reviews/review`
+  downloads those binaries. It refuses to publish when the tag and `package.json` version
+  disagree, and a tag carrying a suffix (`v0.2.0-beta.1`) publishes as a pre-release.
 
 ```sh
 npm version minor        # bump package.json and tag

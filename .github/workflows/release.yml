@@ -56,6 +56,23 @@ jobs:
           case "$GITHUB_REF_NAME" in *-*) flags+=(--prerelease) ;; esac
           gh release create "$GITHUB_REF_NAME" "$VSIX" dist/binaries/* "${flags[@]}"
 
+      - name: Point the Homebrew formula at this release
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          node scripts/brew-formula.mjs --version "$version" --binaries dist/binaries --out /tmp/review.rb
+          git fetch origin main
+          git worktree add /tmp/formula-main origin/main
+          mkdir -p /tmp/formula-main/Formula
+          cp /tmp/review.rb /tmp/formula-main/Formula/review.rb
+          git -C /tmp/formula-main add Formula/review.rb
+          if git -C /tmp/formula-main diff --cached --quiet; then
+            exit 0
+          fi
+          git -C /tmp/formula-main config user.name "github-actions[bot]"
+          git -C /tmp/formula-main config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C /tmp/formula-main commit -m "Point the Homebrew formula at ${GITHUB_REF_NAME}."
+          git -C /tmp/formula-main push origin main
+
       - uses: actions/upload-artifact@v4
         with:
           name: guided-reviews-vsix

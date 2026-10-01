@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { lstat, mkdtemp, mkdir, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdtemp, mkdir, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { SystemExec } from '../core/exec.js'
@@ -112,32 +112,31 @@ describe('review binary', () => {
     expect(out.text).toContain('Review approved')
   })
 
-  it('installs /review in .agents and links it into .claude', async () => {
-    const stale = join(dir, '.cursor/skills/review')
-    await mkdir(stale, { recursive: true })
-    await writeFile(join(stale, 'SKILL.md'), 'stale cursor skill')
+  it('installs /review under the home directory and links it into ~/.claude', async () => {
+    const home = join(dir, 'home')
+    const installed = await binMain(['install'], out, err, { homeDir: home, env: { PATH: '/usr/bin' } })
 
-    expect(await binMain(['install'], out, err)).toBe(0)
-
-    const skill = await readFile(join(dir, reviewSkillPath), 'utf8')
+    expect(installed).toBe(0)
+    const skill = await readFile(join(home, reviewSkillPath), 'utf8')
     expect(skill).toContain('run_in_background: true')
     expect(skill).toContain('in the foreground')
-    const link = join(dir, claudeSkillDir)
+    const link = join(home, claudeSkillDir)
     expect((await lstat(link)).isSymbolicLink()).toBe(true)
     expect(await readlink(link)).toBe('../../.agents/skills/review')
     expect(await readFile(join(link, 'SKILL.md'), 'utf8')).toBe(skill)
-    await expect(lstat(stale)).rejects.toThrow()
-    const lines = (await readFile(join(dir, '.git/info/exclude'), 'utf8')).split('\n').map(line => line.trim())
-    expect(lines.filter(line => line === reviewSkillDir)).toHaveLength(1)
-    expect(lines.filter(line => line === claudeSkillDir)).toHaveLength(1)
+    expect(out.text).toContain(`installed /review skill to ${join(home, reviewSkillDir)}`)
+    expect(out.text).toContain('skipped binary install')
+    await expect(lstat(join(dir, reviewSkillDir))).rejects.toThrow()
   })
 
   it('replaces a real directory or a wrong link at the claude skill path', async () => {
-    const link = join(dir, claudeSkillDir)
+    const home = join(dir, 'home')
+    const link = join(home, claudeSkillDir)
     await mkdir(link, { recursive: true })
     await writeFile(join(link, 'SKILL.md'), 'stale')
+    const deps = { homeDir: home, env: { PATH: '/usr/bin' } }
 
-    expect(await binMain(['install'], out, err)).toBe(0)
+    expect(await binMain(['install'], out, err, deps)).toBe(0)
     expect((await lstat(link)).isSymbolicLink()).toBe(true)
     expect(await readFile(join(link, 'SKILL.md'), 'utf8')).not.toBe('stale')
 
@@ -145,11 +144,36 @@ describe('review binary', () => {
     await mkdir(dirname(link), { recursive: true })
     await symlink('../../elsewhere', link, 'dir')
 
-    expect(await binMain(['install'], out, err)).toBe(0)
+    expect(await binMain(['install'], out, err, deps)).toBe(0)
     expect(await readlink(link)).toBe('../../.agents/skills/review')
-    const lines = (await readFile(join(dir, '.git/info/exclude'), 'utf8')).split('\n').map(line => line.trim())
-    expect(lines.filter(line => line === reviewSkillDir)).toHaveLength(1)
-    expect(lines.filter(line => line === claudeSkillDir)).toHaveLength(1)
+  })
+
+  it('copies the compiled binary into the system bin directory', async () => {
+    const home = join(dir, 'home')
+    const binDir = join(dir, 'bin')
+    const execPath = join(dir, 'build', 'review')
+    await mkdir(dirname(execPath), { recursive: true })
+    await writeFile(execPath, 'binary')
+    await chmod(execPath, 0o755)
+
+    expect(await binMain(['install'], out, err, { homeDir: home, binDir, execPath, platform: 'linux', env: { PATH: '/usr/bin' } })).toBe(0)
+
+    expect(await readFile(join(binDir, 'review'), 'utf8')).toBe('binary')
+    expect(out.text).toContain(`installed review to ${join(binDir, 'review')}`)
+    expect(out.text).toContain(`add ${binDir} to PATH`)
+  })
+
+  it('leaves a binary that is already on PATH where it is', async () => {
+    const home = join(dir, 'home')
+    const binDir = join(dir, 'bin')
+    const execPath = join(binDir, 'review')
+    await mkdir(binDir, { recursive: true })
+    await writeFile(execPath, 'already')
+
+    expect(await binMain(['install'], out, err, { homeDir: home, binDir: join(dir, 'elsewhere'), execPath, platform: 'linux', env: { PATH: `/usr/bin:${binDir}` } })).toBe(0)
+
+    expect(out.text).toContain('review is already installed at')
+    await expect(lstat(join(dir, 'elsewhere', 'review'))).rejects.toThrow()
   })
 
   it('still lists comments without waiting', async () => {

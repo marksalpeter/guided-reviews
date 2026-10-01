@@ -1,5 +1,6 @@
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { AgentRunner, type AgentCommand, type GuideRunner } from '../core/guide.js'
 import { detectAgentCommand } from '../core/harness.js'
 import { Git } from '../core/git.js'
@@ -8,7 +9,7 @@ import { ReviewService } from '../core/review.js'
 import { openCommand } from '../core/uri.js'
 import { main } from './main.js'
 import { startReviewServer } from './server.js'
-import { installReviewSkills } from './skills.js'
+import { installReviewBinary, installReviewSkills, reviewSkillDir, systemBinDir } from './skills.js'
 import type { Writer } from './main.js'
 
 /** usage is printed for `--help`. */
@@ -17,7 +18,7 @@ const usage = `review — open a guided review and wait until it is submitted
   review                                 open the browser and block until Submit
   review comments [--unanswered] [--json]
   review reply <thread-id> -m <message>
-  review install                         install the /review skill
+  review install                         install the /review skill and the binary
 
   --harness claude|codex                 headless command that writes the guide
   --model <name>                         model for that command
@@ -53,9 +54,24 @@ async function dispatch(argv: readonly string[], out: Writer, err: Writer, deps:
     return main([parsed.command, ...parsed.rest], out, err)
   }
   if (parsed.command === 'install') {
-    const root = await repoRoot()
-    await installReviewSkills(root)
-    out.write('installed /review\n')
+    const home = deps.homeDir ?? homedir()
+    await installReviewSkills(home)
+    out.write(`installed /review skill to ${join(home, reviewSkillDir)}\n`)
+    const binary = await installReviewBinary(deps.execPath ?? process.execPath, {
+      binDir: deps.binDir ?? systemBinDir(deps.platform, deps.env),
+      platform: deps.platform,
+      env: deps.env,
+    })
+    if (binary.status === 'installed') {
+      out.write(`installed review to ${binary.path}\n`)
+      if (!binary.onPath) {
+        out.write(`add ${dirname(binary.path)} to PATH\n`)
+      }
+    } else if (binary.status === 'present') {
+      out.write(`review is already installed at ${binary.path}\n`)
+    } else {
+      out.write('skipped binary install; run the compiled review binary, or brew install review\n')
+    }
     return 0
   }
   if (parsed.command !== undefined && parsed.command !== 'open') {
@@ -156,6 +172,11 @@ export interface BinDeps {
   runner?: GuideRunner
   assetsDir?: string
   noOpen?: boolean
+  homeDir?: string
+  binDir?: string
+  execPath?: string
+  platform?: string
+  env?: NodeJS.ProcessEnv
 }
 
 if (require.main === module) {

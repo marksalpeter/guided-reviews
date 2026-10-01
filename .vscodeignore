@@ -16,5 +16,6 @@ vitest*.config.ts
 esbuild.mjs
 eslint.config.mjs
 scripts/**
+Formula/**
 media/icon.svg
 media/screenshot-loading.png
