@@ -63,10 +63,17 @@ body:not([class*='vscode-']) {
   --vscode-editorLineNumber-activeForeground: #BBBEBF;
   --vscode-editorWarning-foreground: #CCA700;
   --vscode-editorLink-activeForeground: #3a94bc;
-  --vscode-diffEditor-insertedLineBackground: #347d3926;
-  --vscode-diffEditor-removedLineBackground: #c93c3726;
-  --vscode-diffEditor-insertedTextBackground: #57ab5a4d;
-  --vscode-diffEditor-removedTextBackground: #f470674d;
+  /* the 2026 diff washes are ~15% opaque and disappear into the page; a changed line stays green or red */
+  --vscode-diffEditor-insertedLineBackground: #1b3a1b;
+  --vscode-diffEditor-removedLineBackground: #3f1d1d;
+  --vscode-diffEditor-insertedTextBackground: #245224;
+  --vscode-diffEditor-removedTextBackground: #6b2e2e;
+  --diff-gutter-insert-background-color: var(--vscode-diffEditor-insertedLineBackground);
+  --diff-gutter-delete-background-color: var(--vscode-diffEditor-removedLineBackground);
+  --diff-code-insert-background-color: var(--vscode-diffEditor-insertedLineBackground);
+  --diff-code-delete-background-color: var(--vscode-diffEditor-removedLineBackground);
+  --diff-code-insert-edit-background-color: var(--vscode-diffEditor-insertedTextBackground);
+  --diff-code-delete-edit-background-color: var(--vscode-diffEditor-removedTextBackground);
   --vscode-editorWidget-background: #202122;
   --vscode-editorWidget-border: #2A2B2C;
   --vscode-editorHoverWidget-background: #202122;
@@ -113,10 +120,16 @@ body.gr-light:not([class*='vscode-']) {
     --vscode-editorLineNumber-activeForeground: #202020;
     --vscode-editorWarning-foreground: #BF8803;
     --vscode-editorLink-activeForeground: #0069CC;
-    --vscode-diffEditor-insertedLineBackground: #9BB95533;
-    --vscode-diffEditor-removedLineBackground: #FF000033;
-    --vscode-diffEditor-insertedTextBackground: #587c0c26;
-    --vscode-diffEditor-removedTextBackground: #ad070726;
+    --vscode-diffEditor-insertedLineBackground: #e6ffec;
+    --vscode-diffEditor-removedLineBackground: #ffebe9;
+    --vscode-diffEditor-insertedTextBackground: #abf2bc;
+    --vscode-diffEditor-removedTextBackground: #ffcecb;
+    --diff-gutter-insert-background-color: var(--vscode-diffEditor-insertedLineBackground);
+    --diff-gutter-delete-background-color: var(--vscode-diffEditor-removedLineBackground);
+    --diff-code-insert-background-color: var(--vscode-diffEditor-insertedLineBackground);
+    --diff-code-delete-background-color: var(--vscode-diffEditor-removedLineBackground);
+    --diff-code-insert-edit-background-color: var(--vscode-diffEditor-insertedTextBackground);
+    --diff-code-delete-edit-background-color: var(--vscode-diffEditor-removedTextBackground);
     --vscode-editorWidget-background: #FAFAFD;
     --vscode-editorWidget-border: #E4E5E6;
     --vscode-editorHoverWidget-background: #FAFAFD;
@@ -669,7 +682,9 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 /* react-diff-view is driven entirely by its own --diff-* variables; map them onto the
    VS Code theme rather than fighting its selectors. Its defaults are light-mode literals
-   and `color: initial`, which render as white-on-pale-green in a dark theme. */
+   and `color: initial`, which render as white-on-pale-green in a dark theme.
+   The browser host sets the same variables on body, next to its palette, because a var()
+   on :root cannot see a custom property that is only declared on body. */
 :root {
   --diff-background-color: var(--vscode-editor-background);
   --diff-text-color: var(--vscode-editor-foreground);
