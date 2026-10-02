@@ -79,6 +79,20 @@ body:not([class*='vscode-']) {
   --vscode-editorHoverWidget-background: #202122;
   --vscode-editorHoverWidget-foreground: #bfbfbf;
   --vscode-editorHoverWidget-border: #2A2B2C;
+  --vscode-peekView-border: #3994BC;
+  --vscode-peekViewEditor-background: #0e1c22;
+  --vscode-peekViewEditorGutter-background: #0e1c22;
+  --vscode-peekViewEditor-matchHighlightBackground: #cd861a73;
+  --vscode-peekViewEditor-matchHighlightBorder: #e09a30;
+  --vscode-peekViewResult-background: #202122;
+  --vscode-peekViewResult-fileForeground: #ededed;
+  --vscode-peekViewResult-lineForeground: #8C8C8C;
+  --vscode-peekViewResult-matchHighlightBackground: #cd861a55;
+  --vscode-peekViewResult-selectionBackground: #3994BC40;
+  --vscode-peekViewResult-selectionForeground: #ffffff;
+  --vscode-peekViewTitle-background: #202122;
+  --vscode-peekViewTitleDescription-foreground: #9d9d9d;
+  --vscode-peekViewTitleLabel-foreground: #ffffff;
   --vscode-editorGroupHeader-tabsBackground: #191A1B;
   --vscode-list-hoverBackground: #FFFFFF14;
   --vscode-list-activeSelectionBackground: #FFFFFF22;
@@ -135,6 +149,20 @@ body.gr-light:not([class*='vscode-']) {
     --vscode-editorHoverWidget-background: #FAFAFD;
     --vscode-editorHoverWidget-foreground: #202020;
     --vscode-editorHoverWidget-border: #E4E5E6;
+    --vscode-peekView-border: #0069CC;
+    --vscode-peekViewEditor-background: #f2f8fc;
+    --vscode-peekViewEditorGutter-background: #f2f8fc;
+    --vscode-peekViewEditor-matchHighlightBackground: #d1861673;
+    --vscode-peekViewEditor-matchHighlightBorder: #b87412;
+    --vscode-peekViewResult-background: #f3f3f3;
+    --vscode-peekViewResult-fileForeground: #202020;
+    --vscode-peekViewResult-lineForeground: #6e6e6e;
+    --vscode-peekViewResult-matchHighlightBackground: #d186164d;
+    --vscode-peekViewResult-selectionBackground: #0069CC33;
+    --vscode-peekViewResult-selectionForeground: #202020;
+    --vscode-peekViewTitle-background: #f3f3f3;
+    --vscode-peekViewTitleDescription-foreground: #6e6e6e;
+    --vscode-peekViewTitleLabel-foreground: #202020;
     --vscode-editorGroupHeader-tabsBackground: #FAFAFD;
     --vscode-list-hoverBackground: #00000014;
     --vscode-list-activeSelectionBackground: #00000025;
@@ -1102,11 +1130,11 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 }
 .diff-code.gr-linked { cursor: pointer; }
 
-/* the callers of a declaration, or a note that a symbol leads nowhere, in the editor's hover chrome */
+/* a note that a symbol leads nowhere, in the editor's hover chrome */
 .gr-tip {
   position: fixed;
   z-index: 50;
-  min-width: 220px;
+  min-width: 160px;
   max-width: 480px;
   overflow: hidden;
   background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
@@ -1116,41 +1144,177 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
   box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
   font-size: 0.92em;
 }
-.gr-tip-head,
 .gr-tip-note { padding: 6px 10px; }
-.gr-tip-head {
-  color: var(--vscode-descriptionForeground);
-  font-family: var(--vscode-editor-font-family);
-}
-.gr-tip-list {
-  /* about ten rows, then it scrolls */
-  max-height: 240px;
-  overflow-y: auto;
-  padding-bottom: 4px;
-  border-top: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-panel-border));
-}
-.gr-tip-path { padding: 6px 10px 2px; font-weight: 600; }
-.gr-tip-row {
+
+/* the editor's peek view: a title, the results, and the source around the match */
+.gr-peek {
+  position: fixed;
+  z-index: 50;
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  width: min(720px, calc(100vw - 16px));
+  max-height: min(360px, calc(100vh - 16px));
+  overflow: hidden;
+  background: var(--vscode-peekViewResult-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-peekViewTitleLabel-foreground, var(--vscode-editor-foreground));
+  border: 1px solid var(--vscode-peekView-border, var(--vscode-focusBorder));
+  border-top-width: 2px;
+  border-radius: 0;
+  box-shadow: 0 0 8px 2px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+  font-size: 13px;
+}
+.gr-peek-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  background: var(--vscode-peekViewTitle-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-peekViewTitleLabel-foreground, var(--vscode-foreground));
+}
+.gr-peek-filename,
+.gr-peek-file {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gr-peek-dirname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-peekViewTitleDescription-foreground, var(--vscode-descriptionForeground));
+  font-size: 12px;
+  font-weight: 400;
+}
+.gr-peek-spacer { flex: 1 1 auto; min-width: 8px; }
+.gr-peek-meta {
+  flex: none;
+  color: var(--vscode-peekViewTitleDescription-foreground, var(--vscode-descriptionForeground));
+  font-size: 12px;
+  white-space: nowrap;
+}
+.gr-peek-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  padding: 0;
+  border-radius: 5px;
+  color: inherit;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+}
+.gr-peek-close:hover { background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground)); }
+.gr-peek-note { padding: 8px 10px; color: var(--vscode-peekViewTitleDescription-foreground, var(--vscode-descriptionForeground)); }
+.gr-peek-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 120px;
+  border-top: 1px solid var(--vscode-peekView-border, var(--vscode-panel-border));
+}
+.gr-peek-body > .gr-peek-editor { flex-basis: 0; }
+.gr-peek-results {
+  flex: 0 0 280px;
+  min-width: 0;
+  max-width: 46%;
+  overflow: auto;
+  background: var(--vscode-peekViewResult-background, var(--vscode-editorWidget-background));
+  border-right: 1px solid var(--vscode-peekView-border, var(--vscode-panel-border));
+}
+.gr-peek-path {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 8px 1px 10px;
+  overflow: hidden;
+  color: var(--vscode-peekViewResult-fileForeground, var(--vscode-foreground));
+  font-weight: 600;
+  font-size: 13px;
+}
+.gr-peek-path .gr-peek-file,
+.gr-peek-path .gr-peek-dirname { min-width: 0; }
+.gr-peek-row {
+  display: flex;
+  gap: 8px;
   width: 100%;
-  padding: 2px 10px 2px 18px;
-  background: none;
+  padding: 0 8px 0 10px;
   border: none;
+  border-radius: 0;
+  background: none;
   color: inherit;
   font-family: var(--vscode-editor-font-family);
-  font-size: inherit;
-  line-height: 18px;
+  font-size: 13px;
+  line-height: 22px;
   text-align: left;
   cursor: pointer;
 }
-.gr-tip-row:hover { background: var(--vscode-list-hoverBackground); }
-.gr-tip-line {
+.gr-peek-row:hover,
+.gr-peek-row.selected:hover { background: var(--vscode-list-hoverBackground); }
+.gr-peek-row.selected,
+.gr-peek-row.selected:hover {
+  background: var(--vscode-peekViewResult-selectionBackground, var(--vscode-list-activeSelectionBackground));
+  color: var(--vscode-peekViewResult-selectionForeground, var(--vscode-list-activeSelectionForeground));
+}
+.gr-peek-line {
   flex: none;
   min-width: 3ch;
   text-align: right;
-  color: var(--vscode-editorLineNumber-foreground);
+  font-variant-numeric: tabular-nums;
+  color: var(--vscode-peekViewResult-lineForeground, var(--vscode-editorLineNumber-foreground));
 }
-.gr-tip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-peek-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-peek-results .gr-peek-match {
+  background: var(--vscode-peekViewResult-matchHighlightBackground, var(--vscode-editor-findMatchHighlightBackground, #ea5c004d));
+  border-radius: 0;
+  color: inherit;
+}
+.gr-peek-editor {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--vscode-peekViewEditor-background, var(--vscode-editor-background));
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  line-height: 18px;
+}
+.gr-peek-rowline { display: flex; white-space: pre; }
+.gr-peek-rowline.is-match { background: var(--vscode-editor-lineHighlightBackground); }
+.gr-peek-gutter {
+  flex: none;
+  width: 4ch;
+  padding: 0 12px 0 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--vscode-editorLineNumber-foreground);
+  background: var(--vscode-peekViewEditorGutter-background, var(--vscode-peekViewEditor-background, var(--vscode-editorGutter-background)));
+  user-select: none;
+}
+.gr-peek-rowline.is-match .gr-peek-gutter { color: var(--vscode-editorLineNumber-activeForeground); }
+.gr-peek-code { flex: 1 1 auto; min-width: 0; }
+.gr-peek-editor .gr-peek-match {
+  background: var(--vscode-peekViewEditor-matchHighlightBackground, var(--vscode-editor-findMatchHighlightBackground, #ff8f0099));
+  box-shadow: inset 0 0 0 1px var(--vscode-peekViewEditor-matchHighlightBorder, transparent);
+  border-radius: 0;
+  color: inherit;
+}
+@media (max-width: 720px) {
+  .gr-peek-body { flex-direction: column; }
+  .gr-peek-results {
+    flex: 0 0 auto;
+    max-width: none;
+    max-height: 120px;
+    border-right: none;
+    border-bottom: 1px solid var(--vscode-peekView-border, var(--vscode-panel-border));
+  }
+  .gr-peek-body > .gr-peek-editor { flex: 1 1 auto; }
+}
 .gr-outdated-list { padding: 10px 0 20px; }
 .gr-outdated-list h3 { font-size: 1em; margin: 0 0 8px; color: var(--vscode-descriptionForeground); }

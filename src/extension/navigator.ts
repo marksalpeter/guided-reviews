@@ -1,7 +1,9 @@
 import * as vscode from 'vscode'
 import { readFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, sep } from 'node:path'
-import type { CodeLocation, Lookup, Reference } from '../core/protocol.js'
+import { fileURLToPath } from 'node:url'
+import type { CodeLocation, Lookup, Peek, Reference } from '../core/protocol.js'
+import { displayLine, peekAt } from '../core/peek.js'
 import { snapshotDir, type Snapshots } from '../core/snapshot.js'
 
 /** snapshotGlob marks every snapshot read-only, including files reached from inside one. */
@@ -67,14 +69,36 @@ export class Navigator {
     const texts = new Map<string, Promise<string[]>>()
     const uses = found.filter(use => !(use.uri.toString() === uri.toString() && use.range.contains(position)))
     const references = await Promise.all(
-      uses.map(async use => ({
-        location: locationOf(use.uri, use.range),
-        path: this.labelFor(use.uri.fsPath, root),
-        line: use.range.start.line + 1,
-        text: ((await linesOf(use.uri, texts))[use.range.start.line] ?? '').trim(),
-      })),
+      uses.map(async use => {
+        const raw = (await linesOf(use.uri, texts))[use.range.start.line] ?? ''
+        const shown = displayLine(raw, use.range.start.character, use.range.end.line === use.range.start.line ? use.range.end.character : raw.length)
+        return {
+          location: locationOf(use.uri, use.range),
+          path: this.labelFor(use.uri.fsPath, root),
+          line: use.range.start.line + 1,
+          text: shown.text,
+          match: shown.match,
+        }
+      }),
     )
-    return references.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line)
+    return references.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line || a.match.start - b.match.start)
+  }
+
+  /** peek reads the window around a location the language server pointed at. */
+  async peek(location: CodeLocation): Promise<Peek | null> {
+    let file: string
+    try {
+      file = fileURLToPath(location.uri)
+    } catch {
+      return null
+    }
+    let text: string
+    try {
+      text = await readFile(file, 'utf8')
+    } catch {
+      return null
+    }
+    return peekAt(this.labelFor(file, snapshotRoot(file) ?? this.repoRoot), text, location)
   }
 
   /** open shows a location beside the review, selected, without taking focus from the panel. */
@@ -150,6 +174,21 @@ function locationOf(uri: vscode.Uri, range: vscode.Range): CodeLocation {
     endLine: range.end.line,
     endCharacter: range.end.character,
   }
+}
+
+/** snapshotRoot is the checkout a snapshot file was read from, when the path is one. */
+function snapshotRoot(file: string): string | undefined {
+  const marker = `${sep}.git${sep}${snapshotDir}${sep}`
+  const at = file.indexOf(marker)
+  if (at < 0) {
+    return undefined
+  }
+  const rest = file.slice(at + marker.length)
+  const slash = rest.indexOf(sep)
+  if (slash < 0) {
+    return undefined
+  }
+  return file.slice(0, at + marker.length + slash)
 }
 
 /** rootOf is the directory a changed file's repository path was joined onto. */

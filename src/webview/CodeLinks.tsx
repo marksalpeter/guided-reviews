@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { computeNewLineNumber, type ChangeData, type EventMap } from 'react-diff-view'
-import type { ColumnRange, HostMessage, Lookup, Reference, ViewMessage } from '../core/protocol.js'
+import type { CodeLocation, ColumnRange, HostMessage, Lookup, Peek, Reference, ViewMessage } from '../core/protocol.js'
 import { columnAt, isLinkModifier, isLinkModifierKey, rangeIn, wordAt } from './links.js'
-import { Progress } from './Progress.js'
-import { post } from './vscodeApi.js'
+import { CallersPeek, DefinitionPeek, referenceKey } from './Peek.js'
+import { browserHost, post } from './vscodeApi.js'
 
-/** answerTimeoutMs is how long a language server is given before its silence counts as no answer. */
-const answerTimeoutMs = 10_000
+/** answerTimeoutMs is how long a language server is given before its silence counts as no answer. The binary starts a compiler on the first hover. */
+const answerTimeoutMs = 30_000
 
 /** tipGraceMs is how long the callers tooltip outlives the pointer leaving it and its word. */
 const tipGraceMs = 300
@@ -31,7 +31,15 @@ export const CodeLinksProvider = ({ version, children }: { version: string; chil
   return (
     <LinksContext.Provider value={{ controller, waiting }}>
       {children}
-      {tip && <LinkTip tip={tip} onEnter={() => controller.holdTip(tip.key)} onLeave={() => controller.holdTip(null)} />}
+      {tip && (
+        <LinkTip
+          tip={tip}
+          onEnter={() => controller.holdTip(tip.key)}
+          onLeave={() => controller.holdTip(null)}
+          onClose={() => controller.close()}
+          onSelect={reference => controller.select(reference)}
+        />
+      )}
     </LinksContext.Provider>
   )
 }
@@ -47,56 +55,54 @@ export function useCodeLinks(path: string): { events: EventMap; waiting: boolean
   return { events, waiting: waiting === path }
 }
 
-/** LinkTip is the tooltip under a declaration listing its callers, or a note that nothing was found. */
-export const LinkTip = ({ tip, onEnter, onLeave }: { tip: Tip; onEnter: () => void; onLeave: () => void }) => {
+/** LinkTip is the peek under a symbol: its callers, its definition, or a note that nothing was found. */
+export const LinkTip = ({
+  tip,
+  onEnter,
+  onLeave,
+  onClose,
+  onSelect,
+}: {
+  tip: Tip
+  onEnter: () => void
+  onLeave: () => void
+  onClose: () => void
+  onSelect: (reference: Reference) => void
+}) => {
   const below = tip.anchor.bottom < window.innerHeight / 2
+  const wide = tip.kind !== 'message'
+  const room = below ? window.innerHeight - tip.anchor.bottom - 12 : tip.anchor.top - 12
   const style = {
-    left: Math.max(8, Math.min(tip.anchor.left, window.innerWidth - 488)),
+    left: Math.max(8, Math.min(tip.anchor.left, window.innerWidth - (wide ? 728 : 488))),
+    ...(wide ? { maxHeight: Math.max(140, Math.min(360, room)) } : {}),
     ...(below ? { top: tip.anchor.bottom + 4 } : { bottom: window.innerHeight - tip.anchor.top + 4 }),
   }
   return (
-    <div className="gr-tip" style={style} onMouseEnter={onEnter} onMouseLeave={onLeave}>
-      {tip.kind === 'message' ? <div className="gr-tip-note">{tip.text}</div> : <Callers name={tip.name} references={tip.references} />}
+    <div
+      className={wide ? 'gr-peek' : 'gr-tip'}
+      style={style}
+      role={wide ? 'dialog' : undefined}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+    >
+      {tip.kind === 'message' && <div className="gr-tip-note">{tip.text}</div>}
+      {tip.kind === 'callers' && (
+        <CallersPeek
+          name={tip.name}
+          references={tip.references}
+          selected={tip.selected}
+          preview={tip.preview}
+          onClose={onClose}
+          onSelect={reference => {
+            onSelect(reference)
+            if (!browserHost) {
+              post({ type: 'openLocation', location: reference.location })
+            }
+          }}
+        />
+      )}
+      {tip.kind === 'definition' && <DefinitionPeek peek={tip.peek} onClose={onClose} />}
     </div>
-  )
-}
-
-/** Callers lists a declaration's uses by file; each row opens its call site beside the review. */
-const Callers = ({ name, references }: { name: string; references: Reference[] | null }) => {
-  if (references === null) {
-    return (
-      <>
-        <div className="gr-tip-head">{name}</div>
-        <Progress label={`Finding references to ${name}`} />
-      </>
-    )
-  }
-  if (references.length === 0) {
-    return <div className="gr-tip-note">No references</div>
-  }
-  return (
-    <>
-      <div className="gr-tip-head">
-        {references.length} reference{references.length === 1 ? '' : 's'}
-      </div>
-      <div className="gr-tip-list">
-        {byPath(references).map(([path, uses]) => (
-          <div className="gr-tip-group" key={path}>
-            <div className="gr-tip-path">{path}</div>
-            {uses.map(use => (
-              <button
-                className="gr-tip-row"
-                key={`${use.line}:${use.location.character}`}
-                onClick={() => post({ type: 'openLocation', location: use.location })}
-              >
-                <span className="gr-tip-line">{use.line}</span>
-                <span className="gr-tip-text">{use.text}</span>
-              </button>
-            ))}
-          </div>
-        ))}
-      </div>
-    </>
   )
 }
 
@@ -108,6 +114,7 @@ class Links {
   private pointer: Pointer | null = null
   private held = false
   private waitingFor: string | null = null
+  private previewFor: string | null = null
   private tip: Tip | null = null
   private closing = 0
   private setTip: (update: Tip | null | ((tip: Tip | null) => Tip | null)) => void
@@ -142,7 +149,7 @@ class Links {
     }
     // a tooltip placed against a word stays put on screen, so it goes when the word moves
     const scrolled = (event: Event) => {
-      if (event.target instanceof Element && event.target.closest('.gr-tip')) {
+      if (event.target instanceof Element && event.target.closest('.gr-tip, .gr-peek')) {
         return
       }
       this.unlink()
@@ -218,7 +225,11 @@ class Links {
       this.waitingFor = null
       this.setWaiting(null)
       if (lookup.kind === 'definition') {
-        post({ type: 'openLocation', location: lookup.target })
+        if (browserHost) {
+          this.showDefinition(word, lookup.target)
+        } else {
+          post({ type: 'openLocation', location: lookup.target })
+        }
       } else if (lookup.kind === 'declaration') {
         this.showCallers(word, lookup.range)
       } else {
@@ -249,7 +260,28 @@ class Links {
     return lookup
   }
 
-  /** showCallers opens the tooltip under a declaration, then fills it once the references arrive. */
+  /** select shows one caller's source in the peek, and opens it beside the review in the editor. */
+  select(reference: Reference): void {
+    const key = referenceKey(reference)
+    if (this.tip?.kind === 'callers' && this.tip.selected === key && this.tip.preview) {
+      return
+    }
+    this.previewFor = key
+    this.setTip(tip => (tip?.kind === 'callers' ? { ...tip, selected: key, preview: undefined } : tip))
+    void this.peek(reference.location).then(preview => {
+      if (this.previewFor !== key) {
+        return
+      }
+      this.setTip(tip => (tip?.kind === 'callers' && tip.selected === key ? { ...tip, preview } : tip))
+    })
+  }
+
+  /** close takes the peek down. */
+  close(): void {
+    this.closeTip()
+  }
+
+  /** showCallers opens the peek under a declaration, then fills it once the references arrive. */
   private showCallers(word: Word, range: ColumnRange): void {
     if (this.tip?.key === word.key && this.tip.kind === 'callers') {
       return
@@ -258,15 +290,44 @@ class Links {
     if (!anchor) {
       return
     }
-    this.openTip({ kind: 'callers', key: word.key, anchor, name: word.text.slice(range.start, range.end), references: null })
+    this.openTip({
+      kind: 'callers',
+      key: word.key,
+      anchor,
+      name: word.text.slice(range.start, range.end),
+      references: null,
+      selected: null,
+      preview: undefined,
+    })
     let callers = this.callers.get(word.key)
     if (!callers) {
       callers = ask<Reference[]>(id => ({ type: 'references', id, ...word.at }), [])
       this.callers.set(word.key, callers)
     }
-    void callers.then(references =>
-      this.setTip(tip => (tip?.key === word.key && tip.kind === 'callers' ? { ...tip, references } : tip)),
-    )
+    void callers.then(references => {
+      this.setTip(tip => (tip?.key === word.key && tip.kind === 'callers' ? { ...tip, references } : tip))
+      const first = references[0]
+      if (first && this.tip?.key === word.key) {
+        this.select(first)
+      }
+    })
+  }
+
+  /** showDefinition opens a peek on the definition, in the browser where no editor sits beside the review. */
+  private showDefinition(word: Word, location: CodeLocation): void {
+    const anchor = rangeIn(word.cell, word.range)?.getBoundingClientRect()
+    if (!anchor) {
+      return
+    }
+    this.openTip({ kind: 'definition', key: word.key, anchor, peek: undefined })
+    void this.peek(location).then(peek => {
+      this.setTip(tip => (tip?.key === word.key && tip.kind === 'definition' ? { ...tip, peek } : tip))
+    })
+  }
+
+  /** peek asks the host for the source window around a location. */
+  private peek(location: CodeLocation): Promise<Peek | null> {
+    return ask<Peek | null>(id => ({ type: 'peek', id, location }), null)
   }
 
   /** showMessage puts a short note under a word, and takes it away on its own. */
@@ -328,6 +389,8 @@ function ask<T>(message: (id: number) => ViewMessage, fallback: T): Promise<T> {
         settle(data.lookup as T)
       } else if (data.type === 'references' && data.id === id) {
         settle(data.references as T)
+      } else if (data.type === 'peek' && data.id === id) {
+        settle(data.peek as T)
       }
     }
     window.addEventListener('message', listener)
@@ -365,15 +428,6 @@ function pointerOf(path: string, change: ChangeData | null, event: MouseEvent<HT
   return { path, change, cell: event.currentTarget, x: event.clientX, y: event.clientY, held: isLinkModifier(event) }
 }
 
-/** byPath groups references under the file they sit in, keeping the host's order. */
-function byPath(references: Reference[]): [string, Reference[]][] {
-  const groups = new Map<string, Reference[]>()
-  for (const reference of references) {
-    groups.set(reference.path, [...(groups.get(reference.path) ?? []), reference])
-  }
-  return [...groups]
-}
-
 /** highlights is the CSS highlight registry, missing outside a real browser. */
 function highlights(): HighlightRegistry | undefined {
   return typeof CSS !== 'undefined' && 'highlights' in CSS ? CSS.highlights : undefined
@@ -402,7 +456,17 @@ interface Word {
   at: { path: string; line: number; character: number }
 }
 
-/** Tip is the tooltip on screen: a declaration's callers, or a short note. */
+/** Tip is the peek on screen: a declaration's callers, a definition, or a short note. */
 export type Tip =
-  | { kind: 'callers'; key: string; anchor: DOMRect; name: string; references: Reference[] | null }
+  | {
+      kind: 'callers'
+      key: string
+      anchor: DOMRect
+      name: string
+      references: Reference[] | null
+      selected: string | null
+      /** preview is undefined while the selected site is loading, and null when it cannot be read. */
+      preview: Peek | null | undefined
+    }
+  | { kind: 'definition'; key: string; anchor: DOMRect; peek: Peek | null | undefined }
   | { kind: 'message'; key: string; anchor: DOMRect; text: string }

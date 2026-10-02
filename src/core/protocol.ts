@@ -32,6 +32,7 @@ export type HostMessage =
   | { type: 'error'; message: string }
   | { type: 'lookup'; id: number; lookup: Lookup }
   | { type: 'references'; id: number; references: Reference[] }
+  | { type: 'peek'; id: number; peek: Peek | null }
 
 /** ViewMessage is sent from the webview to the extension host. */
 export type ViewMessage =
@@ -53,6 +54,7 @@ export type ViewMessage =
   | { type: 'openFile'; path: string; line: number }
   | { type: 'lookup'; id: number; path: string; line: number; character: number }
   | { type: 'references'; id: number; path: string; line: number; character: number }
+  | { type: 'peek'; id: number; location: CodeLocation }
   | { type: 'openLocation'; location: CodeLocation }
   | { type: 'submit' }
 
@@ -82,5 +84,18 @@ export interface Reference {
   location: CodeLocation
   path: string
   line: number
+  text: string
+  /** match is where the symbol sits in `text`, in columns, end exclusive. */
+  match: ColumnRange
+}
+
+/** Peek is a window of source around a place the language server pointed at. */
+export interface Peek {
+  path: string
+  /** line is the 1-based line the match is on. */
+  line: number
+  match: ColumnRange
+  /** startLine is the 1-based line `text` begins on. */
+  startLine: number
   text: string
 }
