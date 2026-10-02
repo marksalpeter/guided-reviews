@@ -2,7 +2,7 @@ import * as vscode from 'vscode'
 import { randomBytes } from 'node:crypto'
 import { ClaudeCli } from '../core/guide.js'
 import { stat } from 'node:fs/promises'
-import type { HostMessage, ReviewPayload, SelectorState, ViewMessage } from '../core/protocol.js'
+import type { CodeLocation, HostMessage, ReviewPayload, SelectorState, ViewMessage } from '../core/protocol.js'
 import { ReviewService, type Selection } from '../core/review.js'
 import { Snapshots } from '../core/snapshot.js'
 import { ReviewStore } from '../core/store.js'
@@ -225,6 +225,8 @@ export class ReviewPanel {
           return await this.lookup(message.id, message.path, message.line, message.character)
         case 'references':
           return await this.references(message.id, message.path, message.line, message.character)
+        case 'peek':
+          return await this.peek(message.id, message.location)
         case 'openLocation':
           return await this.navigator.open(message.location)
         case 'submit':
@@ -309,6 +311,15 @@ export class ReviewPanel {
       this.send({ type: 'references', id, references: await this.navigator.references(this.headSha, path, line, character) })
     } catch {
       this.send({ type: 'references', id, references: [] })
+    }
+  }
+
+  /** peek answers the source window beside a list of callers. */
+  private async peek(id: number, location: CodeLocation): Promise<void> {
+    try {
+      this.send({ type: 'peek', id, peek: await this.navigator.peek(location) })
+    } catch {
+      this.send({ type: 'peek', id, peek: null })
     }
   }
 

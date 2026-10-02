@@ -34,19 +34,27 @@ behind. A run holding a comment thread stays open far enough to show it.
 
 **Hold ⌘ (Ctrl on Linux and Windows) and point at a name.** The language server is asked about
 it the way the editor asks, and the name underlines when it leads somewhere. Click it and its
-definition opens beside the review, the name selected, without the review losing focus.
+definition opens beside the review, the name selected, without the review losing focus. In the
+browser review the same click opens a peek on the page, in the editor's peek colours: the
+filename in the title, the lines around the symbol, and the name marked.
 
-**Point at a declaration to see its callers.** The list groups them by file; click one and its
-call site opens in that same side pane, while the list stays up for the next.
+**Point at a declaration to see its callers.** They are listed the way the editor's references
+peek lists them: the file in the title, the count beside it, each use grouped under its file
+with the name marked, and the selected call site opened beside the list. Click a row in the
+editor and that call site also opens in the side pane.
 
-![⌘ held over a declaration: its name underlined, and its callers listed beneath it](media/screenshot-links.png)
+![⌘ held over a declaration: its name underlined, and its callers in a peek beside the call site](media/screenshot-links.png)
 
 **The answers are for the commit you are reading.** When your working tree already holds it,
 they come from your own files. When it does not — other commits checked out, edits not yet
-committed — the extension checks the commit out beside the repository, under
+committed — the review checks the commit out beside the repository, under
 `.git/guided-reviews`, and asks about that copy, so a line never lands on what has changed
-since. Those files open read-only: the first time one is needed, `files.readonlyInclude`
+since. In the editor those files open read-only: the first time one is needed, `files.readonlyInclude`
 gains `**/.git/guided-reviews/**` in your user settings.
+
+**The browser review asks the project's TypeScript.** The `review` binary loads `typescript`
+from the repository under review, the same one the project compiles with, and answers for
+TypeScript and JavaScript files. A repository that has not installed it leaves the names plain.
 
 ## How to send feedback to agents
 
@@ -191,5 +199,8 @@ money per run. Run that locally before tagging.
   even when a grammar exists — add it to `extensionOverrides`.
 - Themes other than Default Dark+/Light+ get correct UI colours but Dark+/Light+ token
   colours — VS Code exposes no API for a theme's syntax colours.
+- The browser review's code navigation understands TypeScript and JavaScript, through the
+  `typescript` package the repository has installed. Other languages stay plain there; the
+  editor extension keeps asking whichever language server is running.
 </content>
 </invoke>

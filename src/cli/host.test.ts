@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { chmod, lstat, mkdtemp, mkdir, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { SystemExec } from '../core/exec.js'
 import { Git } from '../core/git.js'
+import type { HostMessage } from '../core/protocol.js'
 import { ReviewService } from '../core/review.js'
 import { binMain } from './bin.js'
 import { ReviewHost } from './host.js'
@@ -19,6 +21,9 @@ class Capture {
 
 /** failingRunner stands in for a headless agent so a test never spawns one. */
 const failingRunner = { run: async () => { throw new Error('no model in test') } }
+
+/** typescriptPackage is the compiler this repository installed, resolved before any test changes directory. */
+const typescriptPackage = dirname(createRequire(join(process.cwd(), 'package.json')).resolve('typescript/package.json'))
 
 describe('ReviewHost', () => {
   let dir: string
@@ -60,6 +65,37 @@ describe('ReviewHost', () => {
     expect(result.approved).toBe(false)
     expect(result.text).toContain('needs a null check')
     expect(result.text).toContain('a.ts:4')
+  })
+
+  it('answers a definition from the project typescript', async () => {
+    await mkdir(join(dir, 'src'), { recursive: true })
+    await writeFile(join(dir, 'package.json'), '{"name":"fixture"}\n')
+    await writeFile(
+      join(dir, 'tsconfig.json'),
+      '{ "compilerOptions": { "strict": true, "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler" }, "include": ["src"] }\n',
+    )
+    await writeFile(join(dir, 'src/auth.ts'), 'export function verify(token: string): boolean {\n  return token.length > 0\n}\n')
+    await writeFile(join(dir, 'src/server.ts'), 'import { verify } from "./auth"\nexport function handle(token: string): boolean {\n  return verify(token)\n}\n')
+    await mkdir(join(dir, 'node_modules'), { recursive: true })
+    await symlink(typescriptPackage, join(dir, 'node_modules/typescript'))
+    const exec = new SystemExec(dir)
+    await exec.run('git', ['add', 'package.json', 'tsconfig.json', 'src'])
+    await exec.run('git', ['commit', '-qm', 'types'])
+
+    const host = new ReviewHost(service, failingRunner)
+    const messages: HostMessage[] = []
+    host.send = message => messages.push(message)
+    await host.start()
+    await host.handle({ type: 'lookup', id: 7, path: 'src/server.ts', line: 3, character: 9 })
+    const lookup = messages.find(message => message.type === 'lookup' && message.id === 7)
+    expect(lookup?.type === 'lookup' && lookup.lookup.kind).toBe('definition')
+    if (!lookup || lookup.type !== 'lookup' || lookup.lookup.kind !== 'definition') {
+      return
+    }
+    await host.handle({ type: 'peek', id: 8, location: lookup.lookup.target })
+    const peek = messages.find(message => message.type === 'peek' && message.id === 8)
+    expect(peek?.type === 'peek' && peek.peek?.text).toContain('export function verify')
+    host.close()
   })
 
   it('approves a submit with nothing unanswered', async () => {

@@ -1,11 +1,12 @@
 import { watch, type FSWatcher } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import type { GuideRunner } from '../core/guide.js'
-import type { HostMessage, ReviewPayload, SelectorState, ViewMessage } from '../core/protocol.js'
+import type { CodeLocation, HostMessage, ReviewPayload, SelectorState, ViewMessage } from '../core/protocol.js'
 import { ReviewService, type Selection } from '../core/review.js'
 import { ReviewStore } from '../core/store.js'
 import { unansweredThreads } from '../core/fold.js'
 import { renderThreads } from './render.js'
+import { Symbols } from './symbols.js'
 
 /** ReviewHost is the browser-side panel: the same messages the extension handles, plus Submit. */
 export class ReviewHost {
@@ -20,6 +21,7 @@ export class ReviewHost {
   private focusThread: string | undefined
   private watcher: FSWatcher | undefined
   private settle: ((result: SubmitResult) => void) | undefined
+  private symbols: Symbols
   readonly submitted: Promise<SubmitResult>
   /** send is how a transport delivers one host message to the page. */
   send: (message: HostMessage) => void = () => {}
@@ -28,6 +30,7 @@ export class ReviewHost {
     this.service = service
     this.runner = runner
     this.focusThread = focusThread
+    this.symbols = new Symbols(service.repo)
     this.submitted = new Promise(resolve => {
       this.settle = resolve
     })
@@ -97,14 +100,16 @@ export class ReviewHost {
           await this.sendSource(message.blob)
           return
         case 'lookup':
-          this.send({ type: 'lookup', id: message.id, lookup: { kind: 'none' } })
+          await this.answerLookup(message.id, message.path, message.line, message.character)
+          return
+        case 'references':
+          await this.answerReferences(message.id, message.path, message.line, message.character)
+          return
+        case 'peek':
+          await this.answerPeek(message.id, message.location)
           return
         case 'openFile':
-        case 'references':
         case 'openLocation':
-          if (message.type === 'references') {
-            this.send({ type: 'references', id: message.id, references: [] })
-          }
           return
       }
       await this.push()
@@ -113,10 +118,11 @@ export class ReviewHost {
     }
   }
 
-  /** close stops following the log. */
+  /** close stops following the log and drops the language service. */
   close(): void {
     this.watcher?.close()
     this.watcher = undefined
+    this.symbols.close()
   }
 
   /** finish prints nothing itself; it resolves the wait with the unanswered threads. */
@@ -140,6 +146,7 @@ export class ReviewHost {
   private async push(): Promise<void> {
     try {
       await this.followBranch()
+      this.symbols.prepare(this.requireSelection().headSha)
       const size = await this.logSize()
       const selector = await this.selector()
       const { state, files } = await this.service.load(this.key)
@@ -215,6 +222,41 @@ export class ReviewHost {
         await this.push()
       }
     }
+  }
+
+  /** answerLookup asks the language service where a symbol is defined. Silence counts as nothing. */
+  private async answerLookup(id: number, path: string, line: number, character: number): Promise<void> {
+    const sha = this.headSha()
+    try {
+      this.send({ type: 'lookup', id, lookup: sha ? await this.symbols.lookup(sha, path, line, character) : { kind: 'none' } })
+    } catch {
+      this.send({ type: 'lookup', id, lookup: { kind: 'none' } })
+    }
+  }
+
+  /** answerReferences asks the language service who calls a declaration. */
+  private async answerReferences(id: number, path: string, line: number, character: number): Promise<void> {
+    const sha = this.headSha()
+    try {
+      this.send({ type: 'references', id, references: sha ? await this.symbols.references(sha, path, line, character) : [] })
+    } catch {
+      this.send({ type: 'references', id, references: [] })
+    }
+  }
+
+  /** answerPeek reads the source window a caller or a definition points at. */
+  private async answerPeek(id: number, location: CodeLocation): Promise<void> {
+    const sha = this.headSha()
+    try {
+      this.send({ type: 'peek', id, peek: sha ? await this.symbols.peek(sha, location) : null })
+    } catch {
+      this.send({ type: 'peek', id, peek: null })
+    }
+  }
+
+  /** headSha is the commit the page is reading. */
+  private headSha(): string {
+    return this.selection?.headSha ?? ''
   }
 
   /** sendSource hands the page one blob's text, so the diff can open the lines it left out. */
