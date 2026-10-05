@@ -182,7 +182,7 @@ describe('FileDiff', () => {
     expect(coloured.style.color).toBe('rgb(106, 153, 85)')
   })
 
-  it('leaves an opened run plain while the patch keeps its colours', () => {
+  it('colours an opened run the way it colours the patch', () => {
     const refractor = {
       highlight: (value: string) => [
         { type: 'element', tagName: 'span', properties: { style: 'color:#6a9955' }, children: [{ type: 'text', value }] },
@@ -193,8 +193,24 @@ describe('FileDiff', () => {
     fireEvent.click(screen.getByText('30 lines unchanged'))
     const cell = (text: string) => [...document.querySelectorAll('.diff-code')].find(code => code.textContent === text)
 
-    expect(cell('line1')?.querySelector('span[style]')).toBeNull()
+    expect(cell('line1')?.querySelector<HTMLElement>('span[style]')?.style.color).toBe('rgb(106, 153, 85)')
     expect(cell('LINE32')?.querySelector<HTMLElement>('span[style]')?.style.color).toBe('rgb(106, 153, 85)')
+  })
+
+  it('opens every hidden run from the top of the file, and shuts them again', () => {
+    show()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand all' }))
+
+    expect(screen.getByText('line1')).toBeTruthy()
+    expect(screen.getByText('line60')).toBeTruthy()
+    expect(screen.queryByText(/unchanged/)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }))
+
+    expect(screen.queryByText('line1')).toBeNull()
+    expect(screen.getByText('30 lines unchanged')).toBeTruthy()
+    expect(screen.getByText('27 lines unchanged')).toBeTruthy()
   })
 
   it('offers to expand a reviewed file, which starts shut', () => {

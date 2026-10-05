@@ -16,7 +16,10 @@ import type { Writer } from './main.js'
 /** usage is printed for `--help`. */
 const usage = `review — open a guided review and wait until it is submitted
 
-  review                                 open the browser and block until Submit
+  review                                 open the branch review and block until Submit
+  review <rev>                           open that commit, against its parent
+  review <base>..<head>                  open the diff from base to head
+  review <base> <head>                   the same range, as two arguments
   review comments [--unanswered] [--json]
   review reply <thread-id> -m <message>
   review install                         install the /review skill and the binary
@@ -28,6 +31,9 @@ const usage = `review — open a guided review and wait until it is submitted
   --no-open                              do not open a browser
   --port <n>                             listen port (default: an ephemeral port)
 `
+
+/** commands are the words that name a subcommand rather than a revision. */
+const commands = new Set(['comments', 'reply', 'install', 'open'])
 
 /** binMain is the compiled binary. No arguments wait for Submit; comments and reply stay immediate. */
 export async function binMain(
@@ -85,7 +91,9 @@ async function dispatch(argv: readonly string[], out: Writer, err: Writer, deps:
 /** serve opens the review, generates the guide, and blocks until Submit. */
 async function serve(parsed: ParsedArgs, out: Writer, err: Writer, deps: BinDeps): Promise<number> {
   const root = await repoRoot()
-  const service = new ReviewService(new Git(root, new SystemExec(root)))
+  const git = new Git(root, new SystemExec(root))
+  const service = new ReviewService(git)
+  const page = await reviewUrl(git, parsed.rest)
   const command = parsed.harness ?? detectAgentCommand(process.env)
   const runner = deps.runner ?? new AgentRunner(command, { bin: binaryFor(command, parsed), model: parsed.model })
   const running = await startReviewServer({
@@ -94,12 +102,13 @@ async function serve(parsed: ParsedArgs, out: Writer, err: Writer, deps: BinDeps
     assetsDir: deps.assetsDir ?? assetDir(),
     ...(parsed.port ? { port: parsed.port } : {}),
   })
-  err.write(`Review is open at ${running.url}. Leave comments, then click Submit.\n`)
+  const url = `${running.url}${page}`
+  err.write(`Review is open at ${url}. Leave comments, then click Submit.\n`)
   if (!parsed.noOpen && !deps.noOpen) {
     const env = deps.env ?? process.env
     const platform = deps.platform ?? process.platform
     const launch = deps.launch ?? ((command: string, args: readonly string[]) => new SystemExec(root).run(command, args).then(() => undefined))
-    await openReview(detectEditor(env), running.url, platform, launch)
+    await openReview(detectEditor(env), url, platform, launch)
   }
   const result = await running.submitted
   await running.close()
@@ -143,6 +152,53 @@ async function repoRoot(): Promise<string> {
   return out.trim()
 }
 
+/** reviewUrl is the query string that opens one commit pair, or nothing for the branch review. */
+async function reviewUrl(git: Git, revs: readonly string[]): Promise<string> {
+  const range = await commitRange(git, revs)
+  if (!range) {
+    return ''
+  }
+  return `?${new URLSearchParams({ base: range.base, head: range.head })}`
+}
+
+/** commitRange resolves a revision, a base..head pair, or two revisions into full shas. */
+async function commitRange(git: Git, revs: readonly string[]): Promise<{ base: string; head: string } | undefined> {
+  if (revs.length === 0) {
+    return undefined
+  }
+  if (revs.length === 1 && revs[0]?.includes('..')) {
+    const [base, head] = splitRange(revs[0] ?? '')
+    return { base: await git.revParse(base), head: await git.revParse(head) }
+  }
+  if (revs.length === 1) {
+    const rev = revs[0] ?? ''
+    const head = await git.revParse(rev)
+    const base = await git.parentOf(rev)
+    if (!base) {
+      throw new Error(`${rev} has no parent commit`)
+    }
+    return { base, head }
+  }
+  if (revs.length === 2) {
+    return { base: await git.revParse(revs[0] ?? ''), head: await git.revParse(revs[1] ?? '') }
+  }
+  throw new Error('usage: review [rev | base..head | base head]')
+}
+
+/** splitRange divides base..head, refusing the three-dot form. */
+function splitRange(spec: string): [string, string] {
+  if (spec.includes('...')) {
+    throw new Error(`use base..head, not ${spec}`)
+  }
+  const dots = spec.indexOf('..')
+  const base = spec.slice(0, dots)
+  const head = spec.slice(dots + 2)
+  if (!base || !head) {
+    throw new Error('a range needs both ends: base..head')
+  }
+  return [base, head]
+}
+
 /** parseArgs splits flags from the subcommand. */
 function parseArgs(argv: readonly string[]): ParsedArgs {
   const rest: string[] = []
@@ -163,7 +219,7 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
       parsed.codex = argv[++i]
     } else if (arg === '--port') {
       parsed.port = Number(argv[++i])
-    } else if (!parsed.command && !arg.startsWith('-')) {
+    } else if (!parsed.command && !arg.startsWith('-') && commands.has(arg)) {
       parsed.command = arg
     } else {
       rest.push(arg)

@@ -53,6 +53,9 @@ export class ReviewHost {
     try {
       switch (message.type) {
         case 'ready':
+          if (message.base && message.head) {
+            await this.openNamedRange(message.base, message.head)
+          }
           await this.push()
           await this.autoGenerateGuide()
           return
@@ -178,6 +181,18 @@ export class ReviewHost {
     this.selection = await this.service.selectionAgainst(selection.branch, selection.baseBranch)
     this.key = await this.service.openSelection(this.selection)
     await this.service.reviews.markCurrent(this.key)
+  }
+
+  /** openNamedRange points the page at the commit pair named in its URL. */
+  private async openNamedRange(base: string, head: string): Promise<void> {
+    const baseSha = await this.service.repo.revParse(base)
+    const headSha = await this.service.repo.revParse(head)
+    const branch = this.branch()
+    // the branch equals its base, so this pair stays a frozen range rather than the branch review
+    this.selection = { branch, baseBranch: branch, baseSha, headSha }
+    this.key = await this.service.openSelection(this.selection)
+    await this.service.reviews.markCurrent(this.key)
+    this.guideAttempted = false
   }
 
   /** retarget re-points the page at another commit pair. */

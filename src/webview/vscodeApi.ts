@@ -56,6 +56,7 @@ export interface ViewState {
   mode?: 'guided' | 'diff'
   scrollTop?: number
   collapsed?: string[]
+  openedTests?: string[]
 }
 
 /** VsCodeApi is the subset of the webview bridge this view uses. */

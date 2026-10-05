@@ -22,11 +22,14 @@ You can start a guided review in three ways:
 **Open the lines the diff left out.** Every run of unchanged code carries a bar counting what
 it hides. Click anywhere on it and the whole run opens, so the number you collapse is the
 number you were offered. `Show 20` takes a step instead, for a run too long to want in one go.
+**Expand all**, on the file's title, opens every run in that file at once.
 
 **Shut it again.** The bar becomes the run's handle and holds the top of the pane while the
 lines it opened are on screen, so the way back is one click away however far in you have
 scrolled. Whatever is still hidden keeps its own mark, at the edge those lines actually sit
 behind. A run holding a comment thread stays open far enough to show it.
+
+**Tests follow the code they name.** A test sits under that file, and starts collapsed.
 
 ![A run opened between two hunks: the handle above the borrowed lines, and the mark counting the four it still holds back](media/screenshot-expand.png)
 

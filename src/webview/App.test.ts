@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { withPath } from './App.js'
+import { testsShut, withPath } from './App.js'
 
 describe('withPath', () => {
   it('opens a reviewed file by forcing it, and shuts it again by collapsing it', () => {
@@ -21,5 +21,15 @@ describe('withPath', () => {
     withPath(paths, 'b.ts', true)
 
     expect([...paths]).toEqual(['a.ts'])
+  })
+})
+
+describe('testsShut', () => {
+  it('shuts a test until the reader opens it', () => {
+    const paths = ['a.ts', 'a.test.ts']
+
+    expect(testsShut(paths, new Set(), new Set()).has('a.test.ts')).toBe(true)
+    expect(testsShut(paths, new Set(), new Set(['a.test.ts'])).has('a.test.ts')).toBe(false)
+    expect(testsShut(paths, new Set(), new Set()).has('a.ts')).toBe(false)
   })
 })

@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs'
 import { chmod, copyFile, lstat, mkdir, readlink, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 import { homedir } from 'node:os'
@@ -50,12 +51,14 @@ export async function installReviewBinary(execPath: string, options: BinaryInsta
   const dest = join(options.binDir, base.endsWith('.exe') ? 'review.exe' : 'review')
   await mkdir(options.binDir, { recursive: true })
   try {
+    // overwriting a signed binary keeps its inode, and macOS then kills it for a stale signature
+    await rm(dest, { force: true })
     await copyFile(execPath, dest)
     await chmod(dest, 0o755)
   } catch (error) {
     const code = error instanceof Error && 'code' in error ? String((error as { code?: unknown }).code) : ''
     if (code === 'EACCES' || code === 'EPERM') {
-      throw new Error(`cannot write ${dest}\nsudo cp ${quote(execPath)} ${quote(dest)}`)
+      throw new Error(`cannot replace ${dest}\nsudo rm -f ${quote(dest)} && sudo cp ${quote(execPath)} ${quote(dest)} && sudo chmod 755 ${quote(dest)}`)
     }
     throw error
   }
@@ -111,9 +114,19 @@ function homebrewManaged(filePath: string): boolean {
 /** pathIncludes reports whether dir is an entry of PATH. */
 function pathIncludes(dir: string, platform: string, env: NodeJS.ProcessEnv): boolean {
   const sep = platform === 'win32' ? ';' : ':'
-  const target = strip(dir)
+  // /var and /private/var are the same directory; compare the canonical path of each
+  const target = strip(canonical(dir))
   const path = env.PATH ?? env.Path ?? ''
-  return path.split(sep).some(entry => strip(entry) === target)
+  return path.split(sep).some(entry => strip(canonical(entry)) === target)
+}
+
+/** canonical is the resolved path, or the given path when it does not exist. */
+function canonical(path: string): string {
+  try {
+    return realpathSync(path)
+  } catch {
+    return path
+  }
 }
 
 /** strip drops a trailing slash so equivalent directories compare equal. */
@@ -137,9 +150,18 @@ allowed-tools: Bash(review:*)
 
 Run this only after the user invokes \`/review\`. Do not infer it from a generic review request.
 
+## Which diff
+
+Pass the commits on the command. The printed URL carries them as \`?base=<sha>&head=<sha>\`. Open that URL; those query params are the diff.
+
+- No commit named: \`review\`. The branch against its base. The URL has no query.
+- The last commit: \`review HEAD\`. That commit against its parent.
+- One commit: \`review <sha>\`.
+- A range: \`review <base>..<head>\`, or \`review <base> <head>\`.
+
 ## Wait for Submit
 
-Run \`review\` and wait until the human clicks Submit.
+Run that command and wait until the human clicks Submit.
 
 - **Claude Code:** run it in the background with \`run_in_background: true\`, then wait for that task. Do not poll.
 - **Every other harness:** run it in the foreground and wait until the process exits. Do not background it. A background task in Cursor is polled and spams the chat.

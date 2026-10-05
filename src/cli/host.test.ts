@@ -98,6 +98,22 @@ describe('ReviewHost', () => {
     host.close()
   })
 
+  it('opens the commit pair named on ready', async () => {
+    const host = new ReviewHost(service, failingRunner)
+    const messages: HostMessage[] = []
+    host.send = message => messages.push(message)
+    await host.start()
+    const head = await service.repo.revParse('HEAD')
+    const base = await service.repo.parentOf('HEAD')
+    await host.handle({ type: 'ready', base: base ?? '', head })
+    const review = messages.find(message => message.type === 'review')
+    const refs = review?.type === 'review' ? review.payload.review.state.refs : undefined
+    expect(refs?.baseSha).toBe(base)
+    expect(refs?.headSha).toBe(head)
+    expect(review?.type === 'review' && review.payload.review.files.map(file => file.path)).toEqual(['a.ts'])
+    host.close()
+  })
+
   it('approves a submit with nothing unanswered', async () => {
     const host = new ReviewHost(service, failingRunner)
     await host.start()
@@ -274,6 +290,55 @@ describe('review binary', () => {
     await expect(lstat(join(dir, 'elsewhere', 'review'))).rejects.toThrow()
   })
 
+  it('puts one commit in the url as its parent and itself', async () => {
+    await writeFile(join(dir, 'a.ts'), 'one\ntwo\n')
+    const exec = new SystemExec(dir)
+    await exec.run('git', ['add', '-A'])
+    await exec.run('git', ['commit', '-qm', 'second'])
+    const head = (await exec.run('git', ['rev-parse', 'HEAD'])).trim()
+    const base = (await exec.run('git', ['rev-parse', 'HEAD^'])).trim()
+
+    const pending = binMain(['--no-open', 'HEAD'], out, err, { runner: failingRunner, noOpen: true })
+    const url = await waitForUrl(err)
+    const params = new URL(url).searchParams
+    expect(params.get('base')).toBe(base)
+    expect(params.get('head')).toBe(head)
+    await fetch(`${url.split('?')[0]}api/message`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'ready', base, head }),
+    })
+    await fetch(`${url.split('?')[0]}api/message`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'submit' }),
+    })
+    expect(await pending).toBe(0)
+  })
+
+  it('puts a base..head range in the url', async () => {
+    await writeFile(join(dir, 'a.ts'), 'one\ntwo\n')
+    const exec = new SystemExec(dir)
+    await exec.run('git', ['add', '-A'])
+    await exec.run('git', ['commit', '-qm', 'second'])
+    const head = (await exec.run('git', ['rev-parse', '--short', 'HEAD'])).trim()
+    const base = (await exec.run('git', ['rev-parse', '--short', 'HEAD^'])).trim()
+    const fullHead = (await exec.run('git', ['rev-parse', 'HEAD'])).trim()
+    const fullBase = (await exec.run('git', ['rev-parse', 'HEAD^'])).trim()
+
+    const pending = binMain(['--no-open', `${base}..${head}`], out, err, { runner: failingRunner, noOpen: true })
+    const url = await waitForUrl(err)
+    const params = new URL(url).searchParams
+    expect(params.get('base')).toBe(fullBase)
+    expect(params.get('head')).toBe(fullHead)
+    await fetch(`${url.split('?')[0]}api/message`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'submit' }),
+    })
+    expect(await pending).toBe(0)
+  })
+
   it('still lists comments without waiting', async () => {
     expect(await binMain(['comments'], out, err)).toBe(1)
     expect(err.text).toContain('No review has been opened')
@@ -294,7 +359,7 @@ async function waitFor(ready: () => boolean): Promise<void> {
 /** waitForUrl polls stderr until the server prints its address. */
 async function waitForUrl(err: Capture): Promise<string> {
   for (let i = 0; i < 50; i++) {
-    const match = err.text.match(/http:\/\/127\.0\.0\.1:\d+\//)
+    const match = err.text.match(/http:\/\/127\.0\.0\.1:\d+\/[^\s.]*/)
     if (match) {
       return match[0]
     }

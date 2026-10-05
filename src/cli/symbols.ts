@@ -87,11 +87,11 @@ export class Symbols {
 
   /** resolveProject reuses the service for a tsconfig, and adds the file to it. */
   private async resolveProject(root: string, path: string): Promise<Project | undefined> {
-    const ts = await this.compilerFor(root)
+    const file = normalize(join(root, path))
+    const ts = await this.compilerFor(root, file)
     if (!ts) {
       return undefined
     }
-    const file = normalize(join(root, path))
     const config = configIn(ts, root, file)
     const key = `${root}\0${config}`
     let pending = this.projects.get(key)
@@ -117,12 +117,14 @@ export class Symbols {
     return this.snapshots.rootFor(sha, false)
   }
 
-  /** compilerFor loads the TypeScript installed in the commit, once per checkout. */
-  private compilerFor(root: string): Promise<typeof TS | undefined> {
-    let pending = this.compilers.get(root)
+  /** compilerFor loads the TypeScript the file's package installed, once per installed copy. */
+  private compilerFor(root: string, file: string): Promise<typeof TS | undefined> {
+    const spec = typeScriptPackage(file, root)
+    const key = spec ?? `\0${file}`
+    let pending = this.compilers.get(key)
     if (!pending) {
-      pending = Promise.resolve().then(() => loadTypeScript(root))
-      this.compilers.set(root, pending)
+      pending = Promise.resolve().then(() => (spec ? requireTypeScript(spec) : undefined))
+      this.compilers.set(key, pending)
     }
     return pending
   }
@@ -281,10 +283,54 @@ class Project {
   }
 }
 
-/** loadTypeScript reads the typescript package the checkout installed, the one its program was written for. */
-function loadTypeScript(root: string): typeof TS | undefined {
+/** typeScriptPackage is the nearest typescript that can answer a definition, walking up from the file. */
+function typeScriptPackage(file: string, root: string): string | undefined {
+  const rejected = new Set<string>()
+  let dir = dirname(file)
+  while (dir === root || within(dir, root)) {
+    const found = usableTypeScript(dir, rejected)
+    if (found) {
+      return found
+    }
+    if (dir === root) {
+      break
+    }
+    const parent = dirname(dir)
+    if (parent === dir) {
+      break
+    }
+    dir = parent
+  }
+  return undefined
+}
+
+/** usableTypeScript is the typescript visible from one directory, when it still exports a language service. */
+function usableTypeScript(dir: string, rejected: Set<string>): string | undefined {
+  let resolved: string
   try {
-    const loaded = createRequire(join(root, 'package.json'))('typescript') as typeof TS
+    resolved = createRequire(join(dir, 'package.json')).resolve('typescript/package.json')
+  } catch {
+    return undefined
+  }
+  if (rejected.has(resolved)) {
+    return undefined
+  }
+  try {
+    const loaded = createRequire(resolved)('typescript') as typeof TS
+    if (typeof loaded.createLanguageService === 'function') {
+      return resolved
+    }
+  } catch {
+    // a package that will not load is the same as one with no language service
+  }
+  rejected.add(resolved)
+  return undefined
+}
+
+/** requireTypeScript loads a typescript package that typeScriptPackage already accepted. */
+function requireTypeScript(spec: string): typeof TS | undefined {
+  try {
+    const loaded = createRequire(spec)('typescript') as typeof TS
     return typeof loaded.createLanguageService === 'function' ? loaded : undefined
   } catch {
     return undefined

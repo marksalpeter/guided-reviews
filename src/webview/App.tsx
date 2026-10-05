@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { parseDiff, type FileData } from 'react-diff-view'
-import { orderPaths } from '../core/ordering.js'
+import { anchorOf, isTestPath, orderPaths, placeTests } from '../core/ordering.js'
 import type { HostMessage, LoadedDiff, ReviewPayload } from '../core/protocol.js'
 import type { Guide, GuideGroup, Thread } from '../core/types.js'
 import { BranchBar } from './BranchBar.js'
@@ -22,6 +22,15 @@ export function withPath(paths: ReadonlySet<string>, path: string, present: bool
   return next
 }
 
+/** testsShut adds every test the reader has not opened. */
+export function testsShut(paths: readonly string[], collapsed: ReadonlySet<string>, opened: ReadonlySet<string>): Set<string> {
+  const next = new Set(collapsed)
+  for (const path of paths) {
+    if (isTestPath(path) && !opened.has(path)) next.add(path)
+  }
+  return next
+}
+
 /** focusRevealFrames is how many frames a deep-linked thread is given to render before giving up. */
 const focusRevealFrames = 60
 
@@ -34,6 +43,7 @@ export const App = () => {
   const [fatal, setFatal] = useState('')
   const [mode, setMode] = useState<Mode>(loadViewState().mode ?? 'guided')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(loadViewState().collapsed ?? []))
+  const [openedTests, setOpenedTests] = useState<Set<string>>(new Set(loadViewState().openedTests ?? []))
   // a deep-linked comment must be on screen even in a file the reader has collapsed or ticked off
   const [forced, setForced] = useState<Set<string>>(new Set())
   // base texts arrive one blob at a time, and outlive the payload that asked for them
@@ -44,17 +54,18 @@ export const App = () => {
     [],
   )
   useHostMessages(setPayload, setFatal, addSource)
-  useEffect(() => saveViewState({ mode, collapsed: [...collapsed] }), [mode, collapsed])
+  useEffect(() => saveViewState({ mode, collapsed: [...collapsed], openedTests: [...openedTests] }), [mode, collapsed, openedTests])
 
   // the host sends a fresh payload object on every action, so both memos key on the text they parse
   const files = useMemo(() => (payload ? parseDiff(payload.review.diff) : []), [payload?.review.diff])
+  const shut = useMemo(() => testsShut(files.map(pathOf), collapsed, openedTests), [files, collapsed, openedTests])
   const scheme = useBrowserScheme()
   const refractor = useRefractor(files, scheme?.value)
   const chapters = useChapters(files, payload?.review.state.guide, mode)
   const scroller = useRef<HTMLDivElement>(null)
   useScrollAnchor(scroller, chapters)
   useChapterBand(scroller, chapters)
-  useFocusedThread(payload, setCollapsed, setForced)
+  useFocusedThread(payload, setCollapsed, setForced, setOpenedTests)
 
   const jumpToFile = useCallback((path: string) => {
     document.getElementById(fileAnchorId(path))?.scrollIntoView({ block: 'start' })
@@ -65,6 +76,7 @@ export const App = () => {
   const toggleCollapsed = useCallback((path: string, hidden: boolean) => {
     setCollapsed(previous => withPath(previous, path, !hidden))
     setForced(previous => withPath(previous, path, hidden))
+    if (isTestPath(path)) setOpenedTests(previous => withPath(previous, path, hidden))
   }, [])
 
   if (fatal) {
@@ -113,7 +125,7 @@ export const App = () => {
                       refractor={refractor}
                       source={meta?.oldBlob ? sources[meta.oldBlob] : undefined}
                       reviewed={isReviewed(reviewedBlobs[path], meta?.newBlob)}
-                      collapsed={collapsed.has(path)}
+                      collapsed={shut.has(path)}
                       forced={forced.has(path)}
                       onToggleCollapsed={hidden => toggleCollapsed(path, hidden)}
                       onToggleReviewed={() =>
@@ -309,6 +321,7 @@ function useFocusedThread(
   payload: ReviewPayload | null,
   setCollapsed: (update: (previous: Set<string>) => Set<string>) => void,
   setForced: (update: (previous: Set<string>) => Set<string>) => void,
+  setOpenedTests: (update: (previous: Set<string>) => Set<string>) => void,
 ): void {
   const focus = payload?.focusThread
   const threads = payload?.review.state.threads
@@ -325,6 +338,7 @@ function useFocusedThread(
         return next
       })
       setForced(previous => new Set(previous).add(anchor.path))
+      if (isTestPath(anchor.path)) setOpenedTests(previous => withPath(previous, anchor.path, true))
     }
     return revealThread(focus)
     // the reveal is a one-shot, so it follows the named thread and nothing else
@@ -395,6 +409,17 @@ function useRefractor(files: FileData[], scheme: ColorScheme | undefined): Refra
   return refractor
 }
 
+/** diffRange is the commit pair the page URL names, when both ends are present. */
+function diffRange(): { base?: string; head?: string } {
+  if (typeof location === 'undefined') {
+    return {}
+  }
+  const params = new URLSearchParams(location.search)
+  const base = params.get('base') ?? undefined
+  const head = params.get('head') ?? undefined
+  return base && head ? { base, head } : {}
+}
+
 /** useHostMessages subscribes to the extension host and announces readiness once. */
 function useHostMessages(
   onReview: (payload: ReviewPayload) => void,
@@ -412,7 +437,7 @@ function useHostMessages(
       }
     }
     window.addEventListener('message', listener)
-    post({ type: 'ready' })
+    post({ type: 'ready', ...diffRange() })
     return () => window.removeEventListener('message', listener)
   }, [onReview, onError, onSource])
 }
@@ -423,28 +448,33 @@ function useChapters(files: FileData[], guide: Guide | undefined, mode: Mode): C
 
   return useMemo(() => {
     const byPath = new Map(files.map(file => [pathOf(file), file]))
+    const paths = placeTests(orderPaths(files.map(pathOf), mode === 'guided' ? guide : undefined))
+    const filesOf = (ordered: readonly string[]) => ordered.map(path => byPath.get(path)).filter((file): file is FileData => file !== undefined)
     if (!guide || mode !== 'guided') {
-      return files.length === 0 ? [] : [{ id: 'all', files }]
+      const ordered = filesOf(paths)
+      return ordered.length === 0 ? [] : [{ id: 'all', files: ordered }]
+    }
+
+    const groupOf = new Map<string, string>()
+    for (const group of guide.groups) {
+      for (const path of group.files) groupOf.set(path, group.id)
+    }
+    const buckets = new Map<string, string[]>()
+    for (const path of paths) {
+      const anchor = anchorOf(path, paths)
+      const id = (anchor && groupOf.get(anchor)) || groupOf.get(path) || 'ungrouped'
+      const list = buckets.get(id) ?? []
+      list.push(path)
+      buckets.set(id, list)
     }
 
     const chapters: Chapter[] = []
     for (const group of guide.groups) {
-      const grouped = group.files.map(path => byPath.get(path)).filter((f): f is FileData => f !== undefined)
-      if (grouped.length > 0) {
-        chapters.push({ id: group.id, group, files: grouped })
-      }
+      const grouped = filesOf(buckets.get(group.id) ?? [])
+      if (grouped.length > 0) chapters.push({ id: group.id, group, files: grouped })
     }
-
-    const claimed = new Set(guide.groups.flatMap(group => group.files))
-    const rest = orderPaths(
-      files.map(pathOf).filter(path => !claimed.has(path)),
-      undefined,
-    )
-      .map(path => byPath.get(path))
-      .filter((f): f is FileData => f !== undefined)
-    if (rest.length > 0) {
-      chapters.push({ id: 'ungrouped', files: rest })
-    }
+    const rest = filesOf(buckets.get('ungrouped') ?? [])
+    if (rest.length > 0) chapters.push({ id: 'ungrouped', files: rest })
     return chapters
     // the guide arrives as a fresh object each push; its head and chapter ids are what change
   }, [files, signature, mode])

@@ -36,7 +36,7 @@ export type HostMessage =
 
 /** ViewMessage is sent from the webview to the extension host. */
 export type ViewMessage =
-  | { type: 'ready' }
+  | { type: 'ready'; base?: string; head?: string }
   | { type: 'selectBaseBranch'; branch: string }
   | { type: 'selectBase'; sha: string }
   | { type: 'selectTarget'; sha: string }

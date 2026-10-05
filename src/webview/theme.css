@@ -667,10 +667,25 @@ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 }
 
 .gr-file-header > .gr-file-toggle,
+.gr-file-header > .gr-expand-all,
 .gr-file-header > .gr-stat-add,
 .gr-file-header > .gr-stat-del,
 .gr-file-header > .gr-badge,
 .gr-file-header > .gr-reviewed { flex: none; }
+
+.gr-expand-all {
+  padding: 1px 8px;
+  color: var(--vscode-descriptionForeground);
+  background: transparent;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.gr-expand-all:hover {
+  color: var(--vscode-foreground);
+  background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
 
 .gr-file-toggle {
   display: flex;

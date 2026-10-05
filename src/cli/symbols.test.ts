@@ -110,6 +110,23 @@ describe('Symbols', () => {
     expect(peek?.text).not.toContain('function check')
   })
 
+  it('reads typescript from the package that owns the file when the root has none', async () => {
+    sha = await commitPackage()
+    const use = at(server, 'verify(token)')
+    const definition = await symbols.lookup(sha, 'packages/lib/src/server.ts', use.line, use.character)
+    expect(definition.kind).toBe('definition')
+    if (definition.kind !== 'definition') {
+      return
+    }
+    expect(fileURLToPath(definition.target.uri).endsWith('/packages/lib/src/auth.ts')).toBe(true)
+  })
+
+  it('skips a typescript with no language service and uses the one above it', async () => {
+    sha = await commitPackage({ nearerWithoutService: true })
+    const use = at(server, 'verify(token)')
+    expect((await symbols.lookup(sha, 'packages/lib/src/server.ts', use.line, use.character)).kind).toBe('definition')
+  })
+
   it('has nothing to say when the repository has not installed typescript', async () => {
     sha = await commitProject(false)
     const use = at(server, 'verify(token)')
@@ -144,6 +161,35 @@ describe('Symbols', () => {
     }
     const exec = new SystemExec(dir)
     await exec.run('git', ['add', 'package.json', 'tsconfig.json', 'src', 'README.md'])
+    await exec.run('git', ['commit', '-qm', 'work'])
+    return git.revParse('HEAD')
+  }
+
+  /** commitPackage writes a program whose typescript is installed in the package, not the repository root. */
+  async function commitPackage(options: { nearerWithoutService?: boolean } = {}): Promise<string> {
+    const pkg = join(dir, 'packages/lib')
+    await mkdir(join(pkg, 'src'), { recursive: true })
+    await writeFile(join(dir, 'package.json'), '{"name":"fixture"}\n')
+    await writeFile(join(pkg, 'package.json'), '{"name":"lib"}\n')
+    await writeFile(
+      join(pkg, 'tsconfig.json'),
+      '{ "compilerOptions": { "strict": true, "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler" }, "include": ["src"] }\n',
+    )
+    await writeFile(join(pkg, 'src/auth.ts'), auth)
+    await writeFile(join(pkg, 'src/server.ts'), server)
+    await mkdir(join(pkg, 'node_modules'), { recursive: true })
+    if (options.nearerWithoutService) {
+      await mkdir(join(dir, 'node_modules'), { recursive: true })
+      await symlink(typescriptPackage, join(dir, 'node_modules/typescript'))
+      const stub = join(pkg, 'node_modules/typescript')
+      await mkdir(stub, { recursive: true })
+      await writeFile(join(stub, 'package.json'), '{"name":"typescript","version":"7.0.0","main":"index.js"}\n')
+      await writeFile(join(stub, 'index.js'), 'module.exports = { version: "7.0.0" }\n')
+    } else {
+      await symlink(typescriptPackage, join(pkg, 'node_modules/typescript'))
+    }
+    const exec = new SystemExec(dir)
+    await exec.run('git', ['add', 'package.json', 'packages/lib/package.json', 'packages/lib/tsconfig.json', 'packages/lib/src'])
     await exec.run('git', ['commit', '-qm', 'work'])
     return git.revParse('HEAD')
   }
