@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "are you done",
+  "version": "0.1.0",
+  "description": "See who on the Meet call is done.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "are you done",
+    "default_icon": {
+      "16": "icon-16.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["logic.js", "meet.js", "panel.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["panel.css", "fonts/*"],
+      "matches": ["https://meet.google.com/*"]
+    }
+  ]
+}

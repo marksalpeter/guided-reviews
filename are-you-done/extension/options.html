@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>are you done</title>
+    <style>
+      @font-face {
+        font-family: "Fraunces";
+        src: url("fonts/fraunces-italic.woff2") format("woff2");
+        font-weight: 100 900;
+        font-style: italic;
+      }
+      @font-face {
+        font-family: "Figtree";
+        src: url("fonts/figtree.woff2") format("woff2");
+        font-weight: 100 900;
+        font-style: normal;
+      }
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #141311;
+        color: #f4f0e8;
+        font-family: "Figtree", sans-serif;
+      }
+      main { max-width: 460px; padding: 48px 24px; }
+      h1 {
+        margin: 0;
+        font-family: "Fraunces", Georgia, serif;
+        font-style: italic;
+        font-weight: 520;
+        font-size: 2.4rem;
+        letter-spacing: -0.04em;
+      }
+      p { color: #b1a79b; line-height: 1.5; }
+      label { display: block; margin-bottom: 8px; color: #b1a79b; font-size: 0.9rem; }
+      input, button { font: inherit; }
+      input {
+        box-sizing: border-box;
+        width: 100%;
+        height: 46px;
+        padding: 0 12px;
+        border: 1px solid rgba(244, 240, 232, 0.16);
+        border-radius: 12px;
+        background: #1c1a17;
+        color: #f4f0e8;
+      }
+      input:focus-visible, button:focus-visible {
+        outline: 2px solid #e0a15a;
+        outline-offset: 3px;
+      }
+      button {
+        height: 46px;
+        margin-top: 12px;
+        padding: 0 18px;
+        border: 0;
+        border-radius: 999px;
+        background: #f4f0e8;
+        color: #1a1714;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #saved { min-height: 1.2em; color: #e0a15a; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>are you done</h1>
+      <p>The extension reads names and photos from the Meet call. This is only the address of the sync server those browsers share.</p>
+      <form id="form">
+        <label for="syncUrl">Sync server</label>
+        <input id="syncUrl" name="syncUrl" type="url" required spellcheck="false" value="http://127.0.0.1:8787" />
+        <button type="submit">Save</button>
+      </form>
+      <p id="saved" role="status"></p>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

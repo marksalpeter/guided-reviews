@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Meet fixture</title>
+    <link rel="stylesheet" href="../extension/panel.css" />
+    <link rel="stylesheet" href="call.css" />
+  </head>
+  <body>
+    <header class="callbar" data-ayd-callbar role="banner">
+      <span class="code">abc-defg-hij</span>
+      <span class="time">11:04</span>
+    </header>
+    <main class="stage">
+      <div class="grid">
+        <article class="tile" data-participant-id="devices/ada" data-self-name="Ada Lovelace">
+          <img src="avatars/ada.svg" alt="Ada Lovelace" width="112" height="112" />
+          <span class="label notranslate">Ada Lovelace (You)</span>
+        </article>
+        <article class="tile" data-participant-id="devices/katherine">
+          <img src="avatars/katherine.svg" alt="Katherine Johnson" width="112" height="112" />
+          <span class="label notranslate">Katherine Johnson</span>
+        </article>
+        <article class="tile" data-participant-id="devices/alan">
+          <img src="avatars/alan.svg" alt="Alan Turing" width="112" height="112" />
+          <span class="label notranslate">Alan Turing</span>
+        </article>
+        <article class="tile" data-participant-id="devices/grace">
+          <img src="avatars/grace.svg" alt="Grace Hopper" width="112" height="112" />
+          <span class="label notranslate">Grace Hopper</span>
+        </article>
+      </div>
+    </main>
+    <div id="overlay"></div>
+    <script src="../extension/logic.js"></script>
+    <script src="../extension/meet.js"></script>
+    <script src="../extension/panel.js"></script>
+    <script src="harness.js"></script>
+  </body>
+</html>
